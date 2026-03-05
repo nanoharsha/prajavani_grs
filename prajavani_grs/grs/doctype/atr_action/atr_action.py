@@ -32,8 +32,3 @@ class ATRAction(Document):
                 "status": "Assigned",
             })
 
-def before_save(doc, method=None):
-    doc.before_save()
-
-def after_insert(doc, method=None):
-    doc.after_insert()
