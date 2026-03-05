@@ -1,5 +1,3 @@
-import frappe
 from frappe.model.document import Document
-
-class GRSdepartment(Document):
+class GRSDepartment(Document):
     pass

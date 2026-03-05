@@ -1,5 +1,3 @@
-import frappe
 from frappe.model.document import Document
-
-class GROcategory(Document):
+class GRSCategory(Document):
     pass
