@@ -14,8 +14,3 @@ class AppealATR(Document):
         if self.linked_appeal:
             frappe.db.set_value("Appeal", self.linked_appeal, "status", "ATR Submitted")
 
-def before_save(doc, method=None):
-    doc.before_save()
-
-def after_insert(doc, method=None):
-    doc.after_insert()
