@@ -56,13 +56,3 @@ class Grievance(Document):
         frappe.logger("prajavani_grs").info(
             f"[GRS] Grievance registered: {self.name}")
 
-
-# ── Module-level wrappers required by hooks.py ──
-def before_save(doc, method=None):
-    doc.before_save()
-
-def after_insert(doc, method=None):
-    doc.after_insert()
-
-def on_update(doc, method=None):
-    doc.on_update()
