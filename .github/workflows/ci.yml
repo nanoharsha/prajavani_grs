@@ -1,0 +1,38 @@
+name: Validate App
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate JSON files
+        run: |
+          python -c "
+          import json, os, sys
+          errors = []
+          for root, dirs, files in os.walk('prajavani_grs'):
+              for f in files:
+                  if f.endswith('.json'):
+                      p = os.path.join(root, f)
+                      try:
+                          json.load(open(p))
+                      except Exception as e:
+                          errors.append(f'{p}: {e}')
+          if errors:
+              [print(e) for e in errors]
+              sys.exit(1)
+          print(f'All JSON valid.')
+          "
+      - name: Check required files exist
+        run: |
+          test -f patches.txt && echo "patches.txt OK"
+          test -f setup.py && echo "setup.py OK"
+          test -f pyproject.toml && echo "pyproject.toml OK"
+          test -f prajavani_grs/hooks.py && echo "hooks.py OK"

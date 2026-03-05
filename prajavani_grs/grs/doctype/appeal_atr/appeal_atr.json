@@ -1,0 +1,41 @@
+{
+ "autoname": "GRS-AATR-.YYYY.-.#####",
+ "creation": "2026-03-01 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "fields": [
+  {"fieldname": "linked_appeal",        "fieldtype": "Link",         "label": "Appeal",                          "reqd": 1, "options": "Appeal", "in_list_view": 1, "in_standard_filter": 1, "bold": 1},
+  {"fieldname": "appeal_ref",           "fieldtype": "Data",         "label": "Appeal Ref.",                     "fetch_from": "linked_appeal.name", "read_only": 1, "in_list_view": 1},
+  {"fieldname": "submission_date",      "fieldtype": "Date",         "label": "Date of Submission",              "reqd": 1, "default": "Today"},
+  {"fieldname": "col1",                 "fieldtype": "Column Break"},
+  {"fieldname": "filed_by",             "fieldtype": "Link",         "label": "Filed By (Appellate Authority)",  "reqd": 1, "options": "GRO Officer",
+   "description": "Only officers with Is Appellate Authority = Yes. Original GRO is blocked."},
+  {"fieldname": "filed_by_name",        "fieldtype": "Data",         "label": "Officer Name",                    "fetch_from": "filed_by.full_name",   "read_only": 1},
+  {"fieldname": "filed_by_designation", "fieldtype": "Data",         "label": "Designation",                     "fetch_from": "filed_by.designation", "read_only": 1},
+  {"fieldname": "no_lower_transfer",    "fieldtype": "Check",        "label": "No Transfer to Lower Officers (System Enforced)", "default": "1", "read_only": 1},
+  {"fieldname": "sec_atr",              "fieldtype": "Section Break","label": "Appeal ATR Details"},
+  {"fieldname": "atr_type",             "fieldtype": "Select",       "label": "Outcome",                         "reqd": 1, "in_list_view": 1,
+   "options": "\nFinal Resolution - Grievance Upheld\nFinal Resolution - Grievance Dismissed\nPartially Resolved\nRemanded for Fresh Action"},
+  {"fieldname": "findings",             "fieldtype": "Long Text",    "label": "Appellate Authority Findings",    "reqd": 1},
+  {"fieldname": "order_issued",         "fieldtype": "Long Text",    "label": "Order / Directions Issued",       "reqd": 1},
+  {"fieldname": "citizen_remarks",      "fieldtype": "Long Text",    "label": "Communication to Citizen",        "reqd": 1},
+  {"fieldname": "sec_upload",           "fieldtype": "Section Break","label": "Signed Order"},
+  {"fieldname": "signed_order_file",    "fieldtype": "Attach",       "label": "Signed Order File (PDF)"}
+ ],
+ "icon": "fa fa-balance-scale",
+ "modified": "2026-03-01 00:00:00",
+ "modified_by": "Administrator",
+ "module": "GRS",
+ "name": "Appeal ATR",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "delete": 0, "email": 1, "print": 1, "read": 1, "write": 1, "role": "GRS Appellate Authority"},
+  {"read": 1, "print": 1, "role": "GRS Officer"},
+  {"read": 1, "print": 1, "role": "GRS Citizen"},
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "share": 1, "write": 1, "role": "GRS Admin"}
+ ],
+ "sort_field": "submission_date",
+ "sort_order": "DESC",
+ "title_field": "appeal_ref",
+ "track_changes": 1
+}

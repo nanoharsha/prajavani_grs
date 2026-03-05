@@ -1,0 +1,26 @@
+{
+ "autoname": "field:department_name",
+ "creation": "2026-03-01 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "fields": [
+  {"fieldname": "department_name", "fieldtype": "Data",  "label": "Department Name", "reqd": 1, "in_list_view": 1, "in_standard_filter": 1},
+  {"fieldname": "department_code", "fieldtype": "Data",  "label": "Department Code", "in_list_view": 1},
+  {"fieldname": "active",          "fieldtype": "Check", "label": "Active",           "default": "1"}
+ ],
+ "modified": "2026-03-01 00:00:00",
+ "modified_by": "Administrator",
+ "module": "GRS",
+ "name": "GRS Department",
+ "owner": "Administrator",
+ "permissions": [
+  {"read": 1, "role": "GRS Citizen"},
+  {"read": 1, "role": "GRS Operator"},
+  {"read": 1, "role": "GRS Officer"},
+  {"create": 1, "delete": 1, "read": 1, "write": 1, "role": "GRS Admin"}
+ ],
+ "sort_field": "department_name",
+ "sort_order": "ASC",
+ "title_field": "department_name",
+ "track_changes": 0
+}
