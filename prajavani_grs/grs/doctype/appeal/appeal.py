@@ -9,8 +9,3 @@ class Appeal(Document):
         if self.linked_grievance:
             frappe.db.set_value("Grievance", self.linked_grievance, "status", "Appeal Filed")
 
-def before_save(doc, method=None):
-    doc.before_save()
-
-def after_insert(doc, method=None):
-    doc.after_insert()
