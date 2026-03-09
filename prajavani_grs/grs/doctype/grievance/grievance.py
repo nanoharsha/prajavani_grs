@@ -3,6 +3,15 @@ from frappe.model.document import Document
 from frappe.utils import today, now_datetime, date_diff, add_to_date
 import datetime
 
+
+def _send_sms(mobile, message):
+    try:
+        from frappe.core.doctype.sms_settings.sms_settings import send_sms
+        send_sms([mobile], message)
+    except Exception:
+        frappe.log_error(f"SMS to {mobile}: {message}", "GRS SMS")
+
+
 class Grievance(Document):
 
     def before_save(self):

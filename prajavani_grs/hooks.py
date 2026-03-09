@@ -13,6 +13,7 @@ fixtures = [
     {"dt": "GRS Sub Category"},
 ]
 
+
 scheduler_events = {
     "daily": [
         "prajavani_grs.grs.tasks.daily.check_sla_breaches",
