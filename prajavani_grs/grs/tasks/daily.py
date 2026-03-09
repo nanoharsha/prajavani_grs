@@ -9,8 +9,8 @@ def check_sla_breaches():
         order_by="days_pending desc", limit=500)
     if not breached:
         return
-    admins = frappe.get_list("User", filters={"enabled": 1}, fields=["email"],
-        limit=10)
+    admins = frappe.get_list("Has Role", filters={"role": "GRS Admin", "parenttype": "User"},
+        fields=["parent as email"], limit=10)
     rows = "".join(f"<tr><td>{g['registration_no'] or g['name']}</td>"
         f"<td>{g['department']}</td>"
         f"<td>{g['assigned_officer_name'] or 'Unassigned'}</td>"
