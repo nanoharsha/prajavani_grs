@@ -45,6 +45,6 @@
  ],
  "sort_field": "filing_date",
  "sort_order": "DESC",
- "title_field": "name",
+ "title_field": "grievance_registration_no",
  "track_changes": 1
 }
