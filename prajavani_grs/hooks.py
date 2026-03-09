@@ -7,10 +7,6 @@ app_license = "MIT"
 app_version = "1.0.0"
 
 fixtures = [
-    {"dt": "Role", "filters": [["name", "in", [
-        "GRS Citizen", "GRS Operator", "GRS Officer",
-        "GRS Appellate Authority", "GRS Admin"
-    ]]]},
     {"dt": "GRS District"},
     {"dt": "GRS Department"},
     {"dt": "GRS Category"},
@@ -27,10 +23,3 @@ scheduler_events = {
         "prajavani_grs.grs.tasks.hourly.check_48hr_deadlines",
     ],
 }
-
-website_route_rules = [
-    {"from_route": "/grs",        "to_route": "grs"},
-    {"from_route": "/grs/track",  "to_route": "grs/track"},
-    {"from_route": "/grs/file",   "to_route": "grs/file"},
-    {"from_route": "/grs/appeal", "to_route": "grs/appeal"},
-]

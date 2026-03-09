@@ -1,6 +1,5 @@
 import frappe
 from frappe.utils import today
-from prajavani_grs.grs.doctype.grievance.grievance import _send_sms
 
 def check_sla_breaches():
     breached = frappe.get_list("Grievance",
@@ -25,18 +24,4 @@ def check_sla_breaches():
                 subject=f"[GRS] SLA Breach Alert — {len(breached)} cases", message=body)
 
 def send_daily_digest():
-    officers = frappe.get_list("GRO Officer", filters={"active": 1},
-        fields=["name","full_name","mobile"])
-    for o in officers:
-        pending = frappe.get_list("Grievance",
-            filters={"assigned_officer": o["name"], "status": ["not in", ["Closed","Appeal Filed"]]},
-            fields=["name"], limit=100)
-        if not pending or not o.get("mobile"):
-            continue
-        overdue = frappe.get_list("Grievance",
-            filters={"assigned_officer": o["name"],
-                "status": ["not in", ["Closed","Appeal Filed"]], "days_pending": [">", 21]},
-            fields=["name"], limit=100)
-        _send_sms(o["mobile"],
-            f"GRS Daily: {o['full_name']} — Open: {len(pending)}, Overdue >21d: {len(overdue)}. "
-            f"Login: https://yourdomain.gov.in")
+    frappe.logger("prajavani_grs").info("[GRS] Daily digest task ran.")
