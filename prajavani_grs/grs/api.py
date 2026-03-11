@@ -147,15 +147,21 @@ def track_grievance(registration_no):
     if not registration_no:
         return {"error": "Please enter a registration number."}
 
+    FIELDS = ["name", "status", "filing_date", "department", "category",
+              "gist_of_grievance", "assigned_officer_name",
+              "assignment_date", "citizen_name", "registration_no",
+              "days_pending"]
+
     grievance = frappe.db.get_value(
         "Grievance",
         {"registration_no": registration_no},
-        ["name", "status", "filing_date", "department", "category",
-         "gist_of_grievance", "assigned_officer_name",
-         "assignment_date", "citizen_name", "registration_no",
-         "days_pending"],
+        FIELDS,
         as_dict=True,
     )
+
+    # Fallback: the caller might have the raw document name (e.g. GRS-2026-00001)
+    if not grievance:
+        grievance = frappe.db.get_value("Grievance", registration_no, FIELDS, as_dict=True)
 
     if not grievance:
         return {"error": "No complaint found with this registration number. Please check and try again."}

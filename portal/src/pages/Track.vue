@@ -123,7 +123,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/api/index.js'
 
@@ -173,9 +173,9 @@ const STATUS_COLORS = {
   'Appeal in Progress':        'bg-amber-100 text-amber-700',
 }
 
-const computedStatus = () => data.value?.status_label || ''
-const statusBadgeClass = () =>
-  `text-xs font-semibold px-3 py-1.5 rounded-full ${STATUS_COLORS[computedStatus()] || 'bg-gray-100 text-gray-600'}`
+const statusBadgeClass = computed(() =>
+  `text-xs font-semibold px-3 py-1.5 rounded-full ${STATUS_COLORS[data.value?.status_label || ''] || 'bg-gray-100 text-gray-600'}`
+)
 
 function typeStyle(type) {
   return {
