@@ -45,7 +45,9 @@
   {"fieldname": "doc_2",                       "fieldtype": "Attach",        "label": "Document 2"},
   {"fieldname": "doc_3",                       "fieldtype": "Attach",        "label": "Document 3"},
   {"fieldname": "doc_4",                       "fieldtype": "Attach",        "label": "Document 4"},
-  {"fieldname": "doc_5",                       "fieldtype": "Attach",        "label": "Document 5"}
+  {"fieldname": "doc_5",                       "fieldtype": "Attach",        "label": "Document 5"},
+  {"fieldname": "sec_timeline",               "fieldtype": "Section Break", "label": "Case Timeline", "collapsible": 1},
+  {"fieldname": "case_timeline_html",         "fieldtype": "HTML",          "label": "Timeline"}
  ],
  "icon": "fa fa-file-text",
  "links": [
