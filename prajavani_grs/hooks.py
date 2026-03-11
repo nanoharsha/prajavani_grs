@@ -6,6 +6,10 @@ app_email = ""
 app_license = "MIT"
 app_version = "1.0.0"
 
+website_route_rules = [
+    {"from_route": "/portal/<path:name>", "to_route": "portal"},
+]
+
 fixtures = [
     {"dt": "GRS District"},
     {"dt": "GRS Department"},
