@@ -1,18 +1,530 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Prajavani – Citizen Grievance Portal</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/assets/prajavani_grs/portal/assets/index.css" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏛</text></svg>" />
-    <style>body { margin: 0; background: #f9fafb; }</style>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/assets/prajavani_grs/portal/assets/index.js"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prajavani – Citizen Grievance Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { brand: { 50:'#eff6ff',100:'#dbeafe',500:'#1a56db',600:'#1e40af',700:'#1e3a8a' } },
+          fontFamily: { sans: ['Inter','system-ui','sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    [v-cloak] { display: none; }
+    .fade-enter-active, .fade-leave-active { transition: opacity 0.15s; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; }
+  </style>
+</head>
+<body class="bg-gray-50 font-sans antialiased">
+<div id="app" v-cloak></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "vue":        "https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.esm-browser.prod.js",
+    "vue-router": "https://cdn.jsdelivr.net/npm/vue-router@4.3.0/dist/vue-router.esm-browser.js"
+  }
+}
+</script>
+
+<script type="module">
+import { createApp, ref, reactive, computed, onMounted } from 'vue'
+import { createRouter, createWebHashHistory, RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
+
+// ── API ──────────────────────────────────────────────────────────────────────
+const BASE = '/api/method/prajavani_grs.grs.api'
+async function apicall(method, params = {}) {
+  const url = new URL(`${BASE}.${method}`, location.origin)
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v))
+  const res = await fetch(url, { headers: { Accept: 'application/json' } })
+  const data = await res.json()
+  if (data.exc) throw new Error(data.exc)
+  return data.message
+}
+const api = {
+  track:         reg  => apicall('track_grievance', { registration_no: reg }),
+  departments:   ()   => apicall('get_departments'),
+  categories:    dep  => apicall('get_categories', { department: dep }),
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function fmtDate(d) {
+  if (!d) return ''
+  try { return new Date(d).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) }
+  catch { return d }
+}
+function daysAgo(d) {
+  if (!d) return ''
+  const days = Math.floor((Date.now() - new Date(d)) / 86400000)
+  if (days === 0) return 'today'
+  if (days === 1) return 'yesterday'
+  return `${days} days ago`
+}
+const STATUS_BADGE = {
+  'Received':                'bg-gray-100 text-gray-700',
+  'Officer Assigned':        'bg-blue-100 text-blue-700',
+  'Under Review':            'bg-blue-100 text-blue-700',
+  'Being Investigated':      'bg-indigo-100 text-indigo-700',
+  'Update Sent':             'bg-purple-100 text-purple-700',
+  'Sub-Judice':              'bg-red-100 text-red-700',
+  'Policy Decision Pending': 'bg-orange-100 text-orange-700',
+  'Resolved':                'bg-green-100 text-green-700',
+  'Appeal in Progress':      'bg-amber-100 text-amber-700',
+}
+
+// ── NavBar ───────────────────────────────────────────────────────────────────
+const NavBar = {
+  template: `
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-10">
+    <div class="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
+      <RouterLink to="/" class="flex items-center gap-2 font-bold text-gray-900 text-lg">
+        <span class="text-2xl">🏛</span>
+        <span>Prajavani <span class="text-brand-500">GRS</span></span>
+      </RouterLink>
+      <nav class="flex items-center gap-2">
+        <RouterLink to="/track"
+          class="text-sm font-medium text-gray-600 hover:text-brand-500 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">
+          Track
+        </RouterLink>
+        <RouterLink to="/register"
+          class="text-sm font-semibold px-4 py-1.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors">
+          File Complaint
+        </RouterLink>
+      </nav>
+    </div>
+  </header>`
+}
+
+// ── Home page ────────────────────────────────────────────────────────────────
+const Home = {
+  components: { NavBar },
+  setup() {
+    const router = useRouter()
+    const regNo  = ref('')
+    const error  = ref('')
+    const howItWorks = [
+      { title: 'File Complaint',   desc: 'Submit your grievance online or at your nearest desk.' },
+      { title: 'Officer Assigned', desc: 'An officer is assigned within 48 hours.' },
+      { title: 'Investigation',    desc: 'The officer investigates and may contact you.' },
+      { title: 'Resolution',       desc: 'You receive a formal response. You can appeal if needed.' },
+    ]
+    function doTrack() {
+      if (!regNo.value.trim()) { error.value = 'Please enter a registration number.'; return }
+      router.push({ path: '/track', query: { reg: regNo.value.trim() } })
+    }
+    return { regNo, error, howItWorks, doTrack }
+  },
+  template: `
+  <div>
+    <NavBar />
+    <section class="bg-gradient-to-br from-brand-600 to-brand-700 text-white">
+      <div class="max-w-3xl mx-auto px-4 py-16 text-center">
+        <h1 class="text-3xl sm:text-4xl font-bold mb-3 leading-tight">Your Complaint, Our Responsibility</h1>
+        <p class="text-blue-100 text-lg mb-10">File grievances with the government and track their resolution — simply and transparently.</p>
+        <div class="bg-white rounded-xl p-4 max-w-xl mx-auto shadow-lg">
+          <p class="text-sm font-medium text-gray-500 mb-2 text-left">Already filed a complaint? Track it here</p>
+          <div class="flex gap-2">
+            <input v-model="regNo" @keyup.enter="doTrack" type="text"
+              placeholder="e.g. GRS/2026/ADI/00001"
+              class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <button @click="doTrack" :disabled="!regNo.trim()"
+              class="px-5 py-2.5 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors whitespace-nowrap">
+              Track →
+            </button>
+          </div>
+          <p v-if="error" class="text-red-500 text-xs mt-2">{{ error }}</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="max-w-3xl mx-auto px-4 py-12">
+      <div class="grid sm:grid-cols-3 gap-5">
+        <RouterLink to="/register" class="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md hover:border-brand-300 transition-all block">
+          <div class="text-3xl mb-3">📋</div>
+          <h3 class="font-semibold text-gray-900 mb-1">File a Complaint</h3>
+          <p class="text-sm text-gray-500">Submit a new grievance to the appropriate department.</p>
+        </RouterLink>
+        <RouterLink to="/track" class="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md hover:border-brand-300 transition-all block">
+          <div class="text-3xl mb-3">🔍</div>
+          <h3 class="font-semibold text-gray-900 mb-1">Track Status</h3>
+          <p class="text-sm text-gray-500">Check the current status and history of your complaint.</p>
+        </RouterLink>
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+          <div class="text-3xl mb-3">📞</div>
+          <h3 class="font-semibold text-gray-900 mb-1">Need Help?</h3>
+          <p class="text-sm text-gray-500 mb-2">Mon–Sat, 9am–6pm</p>
+          <a href="tel:1800123456" class="text-brand-500 font-semibold text-sm">1800-XXX-XXXX</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white border-t border-gray-100 py-12">
+      <div class="max-w-3xl mx-auto px-4">
+        <h2 class="text-xl font-bold text-gray-900 text-center mb-8">How It Works</h2>
+        <div class="grid sm:grid-cols-4 gap-6">
+          <div v-for="(s,i) in howItWorks" :key="i" class="text-center">
+            <div class="w-12 h-12 rounded-full bg-blue-50 text-brand-600 flex items-center justify-center text-lg font-bold mx-auto mb-3">{{ i+1 }}</div>
+            <h4 class="font-semibold text-gray-800 text-sm mb-1">{{ s.title }}</h4>
+            <p class="text-xs text-gray-500">{{ s.desc }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="border-t border-gray-200 bg-white mt-0">
+      <div class="max-w-3xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-400">
+        <span>© {{ new Date().getFullYear() }} Prajavani GRS</span>
+        <a href="tel:1800123456" class="text-brand-500">1800-XXX-XXXX</a>
+      </div>
+    </footer>
+  </div>`
+}
+
+// ── Track page ───────────────────────────────────────────────────────────────
+const Track = {
+  components: { NavBar },
+  setup() {
+    const route   = useRoute()
+    const regNo   = ref('')
+    const data    = ref(null)
+    const error   = ref('')
+    const loading = ref(false)
+
+    onMounted(() => {
+      if (route.query.reg) { regNo.value = route.query.reg; load() }
+    })
+
+    async function load() {
+      const reg = regNo.value.trim()
+      if (!reg) return
+      loading.value = true; error.value = ''; data.value = null
+      try {
+        const res = await api.track(reg)
+        if (res?.error) { error.value = res.error }
+        else {
+          res.timeline = (res.timeline || []).map(ev => reactive({ ...ev, open: false }))
+          data.value = res
+        }
+      } catch { error.value = 'Could not connect. Please try again.' }
+      finally { loading.value = false }
+    }
+
+    function badgeClass(label) {
+      return `text-xs font-semibold px-3 py-1.5 rounded-full ${STATUS_BADGE[label] || 'bg-gray-100 text-gray-600'}`
+    }
+    function evStyle(type) {
+      return { atr:{ bg:'bg-green-100', icon:'✅' }, appeal:{ bg:'bg-amber-100', icon:'⚖️' } }[type]
+             || { bg:'bg-gray-100', icon:'📌' }
+    }
+
+    return { regNo, data, error, loading, load, badgeClass, evStyle, fmtDate, daysAgo }
+  },
+  template: `
+  <div>
+    <NavBar />
+    <div class="max-w-2xl mx-auto px-4 py-8">
+
+      <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6 flex gap-2">
+        <input v-model="regNo" @keyup.enter="load" type="text"
+          placeholder="Enter Registration Number e.g. GRS/2026/ADI/00001"
+          class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+        <button @click="load" :disabled="loading || !regNo.trim()"
+          class="px-5 py-2.5 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors">
+          {{ loading ? '…' : 'Track' }}
+        </button>
+      </div>
+
+      <div v-if="loading" class="text-center py-16 text-gray-400">
+        <div class="text-4xl mb-3 animate-spin inline-block">⟳</div>
+        <p>Looking up your complaint…</p>
+      </div>
+
+      <div v-else-if="error" class="bg-white rounded-xl border border-gray-200 p-8 text-center">
+        <div class="text-4xl mb-3">🔍</div>
+        <p class="font-medium text-red-600">{{ error }}</p>
+        <p class="text-sm text-gray-400 mt-1">Check your registration number and try again.</p>
+      </div>
+
+      <template v-else-if="data">
+        <!-- Status header -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <div>
+              <p class="text-xs text-gray-400 font-mono mb-0.5">{{ data.registration_no }}</p>
+              <h2 class="text-lg font-bold text-gray-900">{{ data.department }} — {{ data.category }}</h2>
+              <p class="text-sm text-gray-400 mt-0.5">Filed {{ daysAgo(data.filing_date) }}</p>
+            </div>
+            <span :class="badgeClass(data.status_label)">{{ data.status_label }}</span>
+          </div>
+          <p class="text-sm text-gray-600 bg-gray-50 rounded-lg px-4 py-3 leading-relaxed">{{ data.status_desc }}</p>
+          <p v-if="data.officer_name" class="text-sm text-gray-500 mt-3">
+            Officer assigned: <strong class="text-gray-800">{{ data.officer_name }}</strong>
+          </p>
+        </div>
+
+        <!-- Progress steps -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+          <h3 class="text-sm font-semibold text-gray-700 mb-5">Complaint Progress</h3>
+          <div class="relative">
+            <div class="absolute left-[18px] top-0 bottom-0 w-0.5 bg-gray-200"></div>
+            <div v-for="(s,i) in data.steps" :key="i" class="relative flex items-start gap-4 mb-5 last:mb-0">
+              <div :class="[
+                'w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 text-sm font-bold border-2',
+                s.done   ? 'bg-green-500 border-green-500 text-white' :
+                s.active ? 'bg-brand-500 border-brand-500 text-white' :
+                           'bg-white border-gray-300 text-gray-400'
+              ]">
+                <span v-if="s.done">✓</span>
+                <span v-else-if="s.active">⟳</span>
+                <span v-else>{{ i+1 }}</span>
+              </div>
+              <div class="pt-1.5">
+                <p :class="['font-medium text-sm', s.done ? 'text-gray-900' : s.active ? 'text-brand-600' : 'text-gray-400']">{{ s.label }}</p>
+                <p v-if="s.date" class="text-xs text-gray-400 mt-0.5">{{ fmtDate(s.date) }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timeline -->
+        <div v-if="data.timeline.length" class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+          <h3 class="text-sm font-semibold text-gray-700 mb-4">What Happened So Far</h3>
+          <div v-for="(ev,i) in data.timeline" :key="i" class="mb-4 last:mb-0">
+            <button class="w-full text-left flex items-center justify-between gap-3" @click="ev.open = !ev.open">
+              <div class="flex items-center gap-3">
+                <span :class="['w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0', evStyle(ev.type).bg]">
+                  {{ evStyle(ev.type).icon }}
+                </span>
+                <div>
+                  <p class="font-medium text-sm text-gray-900">{{ ev.title }}</p>
+                  <p class="text-xs text-gray-400">{{ fmtDate(ev.date) }}<span v-if="ev.officer"> · {{ ev.officer }}</span></p>
+                </div>
+              </div>
+              <span class="text-gray-300 text-xs transition-transform duration-200" :style="ev.open ? 'transform:rotate(180deg)' : ''">▼</span>
+            </button>
+            <div v-if="ev.open && Object.keys(ev.details||{}).length"
+              class="mt-3 ml-11 bg-gray-50 rounded-lg p-3 space-y-1.5">
+              <div v-for="(val,key) in ev.details" :key="key" class="flex gap-2 text-sm">
+                <span class="text-gray-400 min-w-[140px] flex-shrink-0">{{ key }}</span>
+                <span class="text-gray-800">{{ val }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gist -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">Your Complaint</h3>
+          <p class="text-sm text-gray-600 leading-relaxed">{{ data.gist }}</p>
+        </div>
+
+        <!-- Appeal CTA -->
+        <div v-if="data.can_appeal" class="bg-amber-50 rounded-xl border border-amber-200 p-5 text-center">
+          <p class="font-semibold text-amber-900 mb-1">Not satisfied with the resolution?</p>
+          <p class="text-sm text-amber-700 mb-4">You can file an appeal to have your case reviewed by a senior authority.</p>
+          <RouterLink to="/register" class="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 text-white font-semibold rounded-lg hover:bg-amber-700 transition-colors">
+            File an Appeal
+          </RouterLink>
+        </div>
+      </template>
+
+      <div v-else class="text-center text-gray-400 py-16">
+        <div class="text-5xl mb-4">🔍</div>
+        <p class="text-gray-500">Enter your registration number above to track your complaint.</p>
+      </div>
+    </div>
+  </div>`
+}
+
+// ── Register page ────────────────────────────────────────────────────────────
+const DISTRICTS = [
+  'Adilabad','Bhadradri Kothagudem','Hyderabad','Jagtial','Jangaon',
+  'Jayashankar Bhupalpally','Jogulamba Gadwal','Kamareddy','Karimnagar',
+  'Khammam','Komaram Bheem','Mahabubabad','Mahabubnagar','Mancherial',
+  'Medak','Medchal–Malkajgiri','Mulugu','Nagarkurnool','Nalgonda',
+  'Narayanpet','Nirmal','Nizamabad','Peddapalli','Rajanna Sircilla',
+  'Rangareddy','Sangareddy','Siddipet','Suryapet','Vikarabad',
+  'Wanaparthy','Warangal Rural','Warangal Urban','Yadadri Bhuvanagiri',
+]
+const Register = {
+  components: { NavBar },
+  setup() {
+    const step       = ref(0)
+    const steps      = ['Personal Details', 'Complaint Details', 'Review & Submit']
+    const departments = ref([])
+    const categories  = ref([])
+    const submitting  = ref(false)
+    const submitError = ref('')
+    const submittedReg = ref('')
+    const form = reactive({ name:'', mobile:'', district:'', department:'', category:'', gist:'' })
+
+    onMounted(async () => {
+      try { departments.value = await api.departments() } catch {}
+    })
+
+    async function loadCats() {
+      form.category = ''
+      categories.value = []
+      try { categories.value = await api.categories(form.department) } catch {}
+    }
+
+    const canProceed = computed(() => {
+      if (step.value === 0) return form.name && form.mobile.length === 10 && form.district
+      if (step.value === 1) return form.department && form.category && form.gist.length >= 20
+      return true
+    })
+
+    async function submit() {
+      submitting.value = true; submitError.value = ''
+      try {
+        await new Promise(r => setTimeout(r, 1000))
+        submittedReg.value = 'GRS/' + new Date().getFullYear() + '/DEMO/00001'
+        step.value = 3
+      } catch { submitError.value = 'Submission failed. Please try again or call the helpline.' }
+      finally { submitting.value = false }
+    }
+
+    return { step, steps, departments, categories, submitting, submitError, submittedReg,
+             form, loadCats, canProceed, submit, DISTRICTS }
+  },
+  template: `
+  <div>
+    <NavBar />
+    <div class="max-w-xl mx-auto px-4 py-10">
+      <div class="text-center mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">File a Complaint</h1>
+        <p class="text-sm text-gray-500 mt-1">All fields marked * are required.</p>
+      </div>
+
+      <!-- Step indicator -->
+      <div v-if="step < 3" class="flex items-center justify-center gap-2 mb-6">
+        <template v-for="(s,i) in steps" :key="i">
+          <div :class="[
+            'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all',
+            step > i  ? 'bg-green-500 border-green-500 text-white' :
+            step === i ? 'bg-brand-500 border-brand-500 text-white' :
+                         'bg-white border-gray-300 text-gray-400'
+          ]">
+            <span v-if="step > i">✓</span><span v-else>{{ i+1 }}</span>
+          </div>
+          <div v-if="i < steps.length-1" class="h-0.5 w-8 bg-gray-200"></div>
+        </template>
+      </div>
+      <p v-if="step < 3" class="text-center text-sm font-medium text-gray-500 mb-6">{{ steps[step] }}</p>
+
+      <div class="bg-white rounded-xl border border-gray-200 p-6">
+        <!-- Step 0 -->
+        <div v-if="step === 0" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+            <input v-model="form.name" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Your full name" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Mobile Number *</label>
+            <input v-model="form.mobile" maxlength="10" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="10-digit mobile number" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">District *</label>
+            <select v-model="form.district" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">Select your district</option>
+              <option v-for="d in DISTRICTS" :key="d" :value="d">{{ d }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Step 1 -->
+        <div v-else-if="step === 1" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Department *</label>
+            <select v-model="form.department" @change="loadCats" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">Select department</option>
+              <option v-for="d in departments" :key="d.name" :value="d.name">{{ d.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+            <select v-model="form.category" :disabled="!form.department" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50">
+              <option value="">{{ form.department ? 'Select category' : 'Select a department first' }}</option>
+              <option v-for="c in categories" :key="c.name" :value="c.name">{{ c.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Describe Your Complaint *</label>
+            <textarea v-model="form.gist" rows="5" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+              placeholder="Describe your complaint clearly. Include dates, locations, and relevant details." />
+            <p class="text-xs text-gray-400 mt-1">{{ form.gist.length }}/1000 characters</p>
+          </div>
+        </div>
+
+        <!-- Step 2: Review -->
+        <div v-else-if="step === 2" class="space-y-2">
+          <h3 class="font-semibold text-gray-800 mb-4">Review your complaint before submitting</h3>
+          <div v-for="[label, val] in [['Name',form.name],['Mobile',form.mobile],['District',form.district],['Department',form.department],['Category',form.category],['Complaint',form.gist]]"
+            :key="label" class="flex gap-3 py-2.5 border-b border-gray-100 last:border-0 text-sm">
+            <span class="text-gray-400 w-28 flex-shrink-0">{{ label }}</span>
+            <span class="text-gray-800">{{ val }}</span>
+          </div>
+          <div v-if="submitError" class="text-red-600 text-sm bg-red-50 rounded-lg p-3 mt-3">{{ submitError }}</div>
+        </div>
+
+        <!-- Step 3: Success -->
+        <div v-else class="text-center py-4">
+          <div class="text-5xl mb-4">✅</div>
+          <h3 class="text-lg font-bold text-gray-900 mb-1">Complaint Filed Successfully!</h3>
+          <p class="text-sm text-gray-500 mb-3">Your registration number is:</p>
+          <div class="bg-gray-50 rounded-lg px-5 py-3 font-mono text-brand-600 font-bold text-lg mb-5">{{ submittedReg }}</div>
+          <p class="text-xs text-gray-400 mb-5">Save this number to track your complaint status.</p>
+          <RouterLink :to="'/track?reg=' + submittedReg"
+            class="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 transition-colors">
+            Track My Complaint →
+          </RouterLink>
+        </div>
+      </div>
+
+      <!-- Nav buttons -->
+      <div v-if="step < 3" class="flex justify-between mt-4">
+        <button v-if="step > 0" @click="step--"
+          class="px-5 py-2.5 bg-white text-gray-700 font-semibold border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          ← Back
+        </button>
+        <div v-else></div>
+        <button v-if="step < 2" @click="step++" :disabled="!canProceed"
+          class="px-5 py-2.5 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors">
+          Next →
+        </button>
+        <button v-else @click="submit" :disabled="submitting"
+          class="px-5 py-2.5 bg-brand-500 text-white font-semibold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors">
+          {{ submitting ? 'Submitting…' : 'Submit Complaint' }}
+        </button>
+      </div>
+    </div>
+  </div>`
+}
+
+// ── Router & App ─────────────────────────────────────────────────────────────
+const router = createRouter({
+  history: createWebHashHistory(),
+  routes: [
+    { path: '/',         component: Home },
+    { path: '/track',    component: Track },
+    { path: '/register', component: Register },
+  ],
+  scrollBehavior: () => ({ top: 0 }),
+})
+
+createApp({ template: '<RouterView />' })
+  .use(router)
+  .component('RouterView', RouterView)
+  .component('RouterLink', RouterLink)
+  .mount('#app')
+</script>
+</body>
 </html>
