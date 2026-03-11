@@ -149,12 +149,12 @@ class Grievance(Document):
             appeal_atr = frappe.get_value(
                 "Appeal ATR",
                 {"linked_appeal": appeal.name},
-                ["outcome", "appellate_findings", "order_date"],
+                ["atr_type", "findings", "submission_date"],
                 as_dict=True
             )
             if appeal_atr:
-                details["Appeal Outcome"] = appeal_atr.get("outcome", "")
-                details["Order Date"] = str(appeal_atr.get("order_date", "") or "")
+                details["Appeal Outcome"] = appeal_atr.get("atr_type", "")
+                details["Order Date"] = str(appeal_atr.get("submission_date", "") or "")
             events.append({
                 "date": str(appeal.filing_date) if appeal.filing_date else "",
                 "type": "appeal",
