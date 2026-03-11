@@ -54,9 +54,16 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Category *</label>
-          <select v-model="form.category" class="input" :disabled="!form.department">
+          <select v-model="form.category" class="input" :disabled="!form.department" @change="loadSubCategories">
             <option value="">{{ form.department ? 'Select category' : 'Select a department first' }}</option>
             <option v-for="c in categories" :key="c.name" :value="c.name">{{ c.name }}</option>
+          </select>
+        </div>
+        <div v-if="subCategories.length">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Sub-Category</label>
+          <select v-model="form.sub_category" class="input">
+            <option value="">Select sub-category (optional)</option>
+            <option v-for="s in subCategories" :key="s.name" :value="s.name">{{ s.name }}</option>
           </select>
         </div>
         <div>
@@ -90,6 +97,10 @@
           <div class="flex gap-3 py-2 border-b border-gray-100">
             <span class="text-gray-400 w-32 flex-shrink-0">Category</span>
             <span class="font-medium text-gray-800">{{ form.category }}</span>
+          </div>
+          <div v-if="form.sub_category" class="flex gap-3 py-2 border-b border-gray-100">
+            <span class="text-gray-400 w-32 flex-shrink-0">Sub-Category</span>
+            <span class="font-medium text-gray-800">{{ form.sub_category }}</span>
           </div>
           <div class="flex gap-3 py-2">
             <span class="text-gray-400 w-32 flex-shrink-0">Complaint</span>
@@ -145,13 +156,14 @@ const districts = [
   'Wanaparthy', 'Warangal Rural', 'Warangal Urban', 'Yadadri Bhuvanagiri',
 ]
 
-const departments  = ref([])
-const categories   = ref([])
-const submitting   = ref(false)
-const submitError  = ref('')
-const submittedReg = ref('')
+const departments    = ref([])
+const categories     = ref([])
+const subCategories  = ref([])
+const submitting     = ref(false)
+const submitError    = ref('')
+const submittedReg   = ref('')
 
-const form = ref({ name: '', mobile: '', district: '', department: '', category: '', gist: '' })
+const form = ref({ name: '', mobile: '', district: '', department: '', category: '', sub_category: '', gist: '' })
 
 onMounted(async () => {
   try { departments.value = await api.getDepartments() } catch {}
@@ -159,7 +171,15 @@ onMounted(async () => {
 
 async function loadCategories() {
   form.value.category = ''
+  form.value.sub_category = ''
+  subCategories.value = []
   try { categories.value = await api.getCategories(form.value.department) } catch {}
+}
+
+async function loadSubCategories() {
+  form.value.sub_category = ''
+  subCategories.value = []
+  try { subCategories.value = await api.getSubCategories(form.value.category) } catch {}
 }
 
 const canProceed = computed(() => {
@@ -172,11 +192,21 @@ async function submit() {
   submitting.value = true
   submitError.value = ''
   try {
-    // Citizens file via Frappe desk login for now; this is a placeholder.
-    // Full guest filing requires OTP verification (future sprint).
-    await new Promise(r => setTimeout(r, 1200))
-    submittedReg.value = 'GRS/' + new Date().getFullYear() + '/DEMO/00001'
-    step.value = 3
+    const res = await api.submitGrievance({
+      full_name:    form.value.name,
+      mobile:       form.value.mobile,
+      district:     form.value.district,
+      department:   form.value.department,
+      category:     form.value.category,
+      gist:         form.value.gist,
+      sub_category: form.value.sub_category || undefined,
+    })
+    if (res?.error) {
+      submitError.value = res.error
+    } else {
+      submittedReg.value = res.registration_no
+      step.value = 3
+    }
   } catch (e) {
     submitError.value = 'Submission failed. Please try again or call the helpline.'
   } finally {

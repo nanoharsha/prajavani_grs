@@ -194,3 +194,66 @@ def get_categories(department=None):
         filters["department"] = department
     cats = frappe.db.get_all("GRS Category", filters=filters, fields=["name"], order_by="name asc")
     return cats
+
+
+@frappe.whitelist(allow_guest=True)
+def get_sub_categories(category=None):
+    filters = {}
+    if category:
+        filters["category"] = category
+    return frappe.db.get_all("GRS Sub Category", filters=filters, fields=["name"], order_by="name asc")
+
+
+@frappe.whitelist(allow_guest=True)
+def submit_grievance(full_name, mobile, district, department, category, gist,
+                     gender=None, sub_category=None):
+    """Public endpoint: citizen files a grievance online."""
+    full_name  = (full_name or "").strip()
+    mobile     = (mobile or "").strip()
+    district   = (district or "").strip()
+    department = (department or "").strip()
+    category   = (category or "").strip()
+    gist       = (gist or "").strip()
+
+    if not all([full_name, mobile, district, department, category, gist]):
+        return {"error": "All required fields must be filled."}
+    if len(mobile) != 10 or not mobile.isdigit():
+        return {"error": "Please enter a valid 10-digit mobile number."}
+    if len(gist) < 20:
+        return {"error": "Please describe your complaint in at least 20 characters."}
+
+    # Find existing citizen by mobile, or create a new one
+    citizen_name = frappe.db.get_value("Citizen", {"mobile_number": mobile}, "name")
+    if not citizen_name:
+        citizen = frappe.get_doc({
+            "doctype": "Citizen",
+            "full_name": full_name,
+            "mobile_number": mobile,
+            "gender": gender or "Male",
+            "district": district,
+            # aadhaar_last4, mandal_ward, address are collected offline
+            "aadhaar_last4": "0000",
+            "address": f"{district} (Online)",
+        })
+        citizen.insert(ignore_permissions=True, ignore_mandatory=True)
+        citizen_name = citizen.name
+
+    grievance = frappe.get_doc({
+        "doctype": "Grievance",
+        "filing_date": frappe.utils.today(),
+        "channel": "Online",
+        "registration_level": "State",
+        "status": "New",
+        "grievance_type": "Individual",
+        "citizen": citizen_name,
+        "department": department,
+        "category": category,
+        "sub_category": sub_category or None,
+        "gist_of_grievance": gist,
+    })
+    grievance.insert(ignore_permissions=True, ignore_mandatory=True)
+    frappe.db.commit()
+
+    # Reload to get registration_no set by after_insert hook
+    reg_no = frappe.db.get_value("Grievance", grievance.name, "registration_no") or grievance.name
+    return {"registration_no": reg_no}
