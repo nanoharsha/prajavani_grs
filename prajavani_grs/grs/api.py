@@ -226,7 +226,26 @@ def track_grievance(registration_no):
         as_dict=True,
     )
 
-    # Fallback: the caller might have the raw document name (e.g. GRS-2026-00001)
+    # Fallback 1: try case-insensitive / normalised format variants
+    # Old records used GRS/YYYY/DIST/SEQ (slashes); new ones use GRS-DIST-YYYY-SEQ (dashes).
+    # Convert between the two so both formats always work.
+    if not grievance:
+        if "/" in query:
+            # slash → dash: "GRS/2026/HYD/00001" → "GRS-HYD-2026-00001"
+            parts = query.split("/")
+            if len(parts) == 4:
+                alt = f"{parts[0]}-{parts[2]}-{parts[1]}-{parts[3]}"
+                grievance = frappe.db.get_value(
+                    "Grievance", {"registration_no": alt}, FIELDS, as_dict=True)
+        else:
+            # dash → slash: "GRS-HYD-2026-00001" → "GRS/2026/HYD/00001"
+            parts = query.split("-")
+            if len(parts) == 4:
+                alt = f"{parts[0]}/{parts[2]}/{parts[1]}/{parts[3]}"
+                grievance = frappe.db.get_value(
+                    "Grievance", {"registration_no": alt}, FIELDS, as_dict=True)
+
+    # Fallback 2: the caller might have the raw Frappe document name (e.g. GRS-2026-00001)
     if not grievance:
         grievance = frappe.db.get_value("Grievance", query, FIELDS, as_dict=True)
 
@@ -237,7 +256,7 @@ def track_grievance(registration_no):
     status_label, status_desc = STATUS_LABELS.get(grievance.status, (grievance.status, ""))
 
     return {
-        "registration_no": grievance.registration_no,
+        "registration_no": grievance.registration_no or grievance.name,
         "citizen_name":    grievance.citizen_name,
         "department":      grievance.department,
         "category":        grievance.category,

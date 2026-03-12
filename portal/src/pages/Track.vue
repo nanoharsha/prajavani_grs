@@ -12,7 +12,7 @@
           <span v-else>Track</span>
         </button>
       </div>
-      <p class="text-xs text-gray-400 mt-2">Enter your registration number (e.g. GRS/2026/HYD/00001) or your registered mobile number.</p>
+      <p class="text-xs text-gray-400 mt-2">Enter your registration number (e.g. GRS-HYD-2026-00001) or your registered mobile number.</p>
     </div>
 
     <!-- Error -->
@@ -50,9 +50,9 @@
       <div class="card p-5 mb-5">
         <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
           <div>
-            <p class="text-xs text-gray-400 font-mono mb-0.5">{{ data.registration_no }}</p>
-            <h2 class="text-lg font-bold text-gray-900">{{ data.department }} — {{ data.category }}</h2>
-            <p class="text-sm text-gray-500 mt-0.5">Filed {{ daysAgo(data.filing_date) }}</p>
+            <p class="text-xs text-gray-400 font-mono mb-0.5">{{ data.registration_no || '—' }}</p>
+            <h2 class="text-lg font-bold text-gray-900">{{ data.department || 'Department not specified' }}<span v-if="data.category"> — {{ data.category }}</span></h2>
+            <p class="text-sm text-gray-500 mt-0.5">Filed {{ data.filing_date ? daysAgo(data.filing_date) : '—' }}</p>
           </div>
           <span :class="statusBadgeClass">{{ data.status_label }}</span>
         </div>
@@ -116,7 +116,7 @@
       <!-- Gist -->
       <div class="card p-5 mb-5">
         <h3 class="text-sm font-semibold text-gray-700 mb-2">Your Complaint</h3>
-        <p class="text-sm text-gray-600 leading-relaxed">{{ data.gist }}</p>
+        <p class="text-sm leading-relaxed" :class="data.gist ? 'text-gray-600' : 'text-gray-400 italic'">{{ data.gist || 'Complaint details not available.' }}</p>
       </div>
 
       <!-- Appeal CTA -->
@@ -195,6 +195,8 @@ async function loadByRegNo(regNo) {
     if (res?.error) { error.value = res.error }
     else {
       res.timeline = (res.timeline || []).map(ev => reactive({ ...ev, _open: false }))
+      // Preserve the clicked registration_no if the API response has none
+      if (!res.registration_no) res.registration_no = regNo
       data.value = res
     }
   } catch {

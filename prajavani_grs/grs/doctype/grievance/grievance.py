@@ -36,7 +36,8 @@ class Grievance(Document):
                 district_code = dist[:3].upper()
         year = datetime.date.today().year
         seq = self.name.split("-")[-1] if self.name else "00001"
-        self.registration_no = f"GRS/{year}/{district_code}/{seq}"
+        # Use dash-separated format so users can type it easily from the confirmation screen
+        self.registration_no = f"GRS-{district_code}-{year}-{seq}" if district_code else f"GRS-{year}-{seq}"
         frappe.db.set_value("Grievance", self.name, "registration_no", self.registration_no)
 
     def _handle_assignment(self):
