@@ -214,8 +214,11 @@ const Track = {
       return `text-xs font-semibold px-3 py-1.5 rounded-full ${STATUS_BADGE[label] || 'bg-gray-100 text-gray-600'}`
     }
     function evStyle(type) {
-      return { atr:{ bg:'bg-green-100', icon:'✅' }, appeal:{ bg:'bg-amber-100', icon:'⚖️' } }[type]
-             || { bg:'bg-gray-100', icon:'📌' }
+      return {
+        atr:       { bg:'bg-green-100',  icon:'✅' },
+        appeal:    { bg:'bg-amber-100',  icon:'⚖️' },
+        prajavani: { bg:'bg-purple-100', icon:'🏛' },
+      }[type] || { bg:'bg-gray-100', icon:'📌' }
     }
 
     return { regNo, data, error, loading, load, badgeClass, evStyle, fmtDate, daysAgo }

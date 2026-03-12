@@ -1,0 +1,42 @@
+{
+ "autoname": "PRAJ-.YYYY.-.#####",
+ "creation": "2026-03-12 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "fields": [
+  {"fieldname": "grievance",               "fieldtype": "Link",         "label": "Grievance",                "reqd": 1, "options": "Grievance", "in_list_view": 1, "in_standard_filter": 1, "bold": 1},
+  {"fieldname": "grievance_reg_no",        "fieldtype": "Data",         "label": "Grievance Reg. No.",       "fetch_from": "grievance.registration_no", "read_only": 1, "in_list_view": 1},
+  {"fieldname": "prajavani_date",          "fieldtype": "Date",         "label": "Prajavani Date",           "reqd": 1, "default": "Today", "in_list_view": 1},
+  {"fieldname": "prajavani_level",         "fieldtype": "Select",       "label": "Prajavani Level",          "reqd": 1, "options": "\nMandal\nDistrict\nState", "in_list_view": 1, "in_standard_filter": 1},
+  {"fieldname": "location",                "fieldtype": "Data",         "label": "Location / Venue",         "reqd": 1, "in_list_view": 1},
+  {"fieldname": "col1",                    "fieldtype": "Column Break"},
+  {"fieldname": "nodal_officer",           "fieldtype": "Link",         "label": "Nodal Officer",            "options": "GRO Officer"},
+  {"fieldname": "nodal_officer_name",      "fieldtype": "Data",         "label": "Nodal Officer Name",       "fetch_from": "nodal_officer.full_name", "read_only": 1},
+  {"fieldname": "attending_officer",       "fieldtype": "Link",         "label": "Attending GRO Officer",    "options": "GRO Officer"},
+  {"fieldname": "attending_officer_name",  "fieldtype": "Data",         "label": "Attending Officer Name",   "fetch_from": "attending_officer.full_name", "read_only": 1},
+  {"fieldname": "citizen_present",         "fieldtype": "Check",        "label": "Citizen Was Present",      "default": "1"},
+  {"fieldname": "sec_remarks",             "fieldtype": "Section Break","label": "Hearing Remarks"},
+  {"fieldname": "gro_remarks",             "fieldtype": "Long Text",    "label": "GRO Remarks / Order"},
+  {"fieldname": "citizen_remarks",         "fieldtype": "Long Text",    "label": "Citizen Remarks"},
+  {"fieldname": "sec_docs",                "fieldtype": "Section Break","label": "Documents Submitted at Prajavani"},
+  {"fieldname": "doc_1",                   "fieldtype": "Attach",       "label": "Document 1"},
+  {"fieldname": "doc_2",                   "fieldtype": "Attach",       "label": "Document 2"},
+  {"fieldname": "doc_3",                   "fieldtype": "Attach",       "label": "Document 3"}
+ ],
+ "icon": "fa fa-users",
+ "links": [{"link_doctype": "Grievance", "link_fieldname": "grievance"}],
+ "modified": "2026-03-12 00:00:00",
+ "modified_by": "Administrator",
+ "module": "GRS",
+ "name": "Prajavani Attendance",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "delete": 0, "email": 1, "print": 1, "read": 1, "write": 1, "role": "GRS Operator"},
+  {"read": 1, "print": 1, "role": "GRS Officer"},
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "share": 1, "write": 1, "role": "GRS Admin"}
+ ],
+ "sort_field": "prajavani_date",
+ "sort_order": "DESC",
+ "title_field": "grievance_reg_no",
+ "track_changes": 1
+}

@@ -134,7 +134,39 @@ def _build_timeline(grievance):
             "details": details,
         })
 
-    # 4. Appeals
+    # 4. Prajavani attendances (multiple allowed)
+    praj_list = frappe.db.get_all(
+        "Prajavani Attendance",
+        filters={"grievance": grievance.name},
+        fields=["prajavani_date", "prajavani_level", "location",
+                "attending_officer_name", "nodal_officer_name",
+                "citizen_present", "gro_remarks", "citizen_remarks", "name"],
+        order_by="prajavani_date asc",
+    )
+    for pa in praj_list:
+        details = {
+            "Level":    pa.prajavani_level,
+            "Venue":    pa.location,
+        }
+        if pa.attending_officer_name:
+            details["Attending Officer"] = pa.attending_officer_name
+        if pa.nodal_officer_name:
+            details["Nodal Officer"] = pa.nodal_officer_name
+        if pa.gro_remarks:
+            details["GRO Remarks"] = pa.gro_remarks
+        if pa.citizen_remarks:
+            details["Citizen Remarks"] = pa.citizen_remarks
+        if not pa.citizen_present:
+            details["Note"] = "Citizen was not present"
+        events.append({
+            "date":    str(pa.prajavani_date or ""),
+            "type":    "prajavani",
+            "title":   f"Prajavani Hearing — {pa.prajavani_level} Level",
+            "officer": pa.attending_officer_name or "",
+            "details": details,
+        })
+
+    # 5. Appeals
     appeals = frappe.db.get_all(
         "Appeal",
         filters={"linked_grievance": grievance.name},

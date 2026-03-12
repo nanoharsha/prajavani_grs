@@ -15,6 +15,7 @@ fixtures = [
     {"dt": "GRS Department"},
     {"dt": "GRS Category"},
     {"dt": "GRS Sub Category"},
+    {"dt": "Print Format", "filters": [["doc_type", "=", "Prajavani Attendance"]]},
 ]
 
 
