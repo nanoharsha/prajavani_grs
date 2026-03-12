@@ -89,8 +89,8 @@
       </div>
 
       <!-- Timeline -->
-      <div v-if="data.timeline.length" class="card p-5 mb-5">
-        <h3 class="text-sm font-semibold text-gray-700 mb-4">What Happened So Far</h3>
+      <div class="card p-5 mb-5">
+        <h3 class="text-sm font-semibold text-gray-700 mb-4">History</h3>
         <div v-for="(ev, i) in data.timeline" :key="i" class="mb-4 last:mb-0">
           <button class="w-full text-left flex items-center justify-between gap-3 group" @click="ev._open = !ev._open">
             <div class="flex items-center gap-3">
@@ -232,8 +232,10 @@ function badgeClass(label) {
 
 function typeStyle(type) {
   return {
-    atr:    { bg: 'bg-green-100',  icon: '✅' },
-    appeal: { bg: 'bg-amber-100',  icon: '⚖️' },
+    filed:    { bg: 'bg-blue-100',   icon: '📋' },
+    assigned: { bg: 'bg-indigo-100', icon: '👤' },
+    atr:      { bg: 'bg-green-100',  icon: '✅' },
+    appeal:   { bg: 'bg-amber-100',  icon: '⚖️' },
   }[type] || { bg: 'bg-gray-100', icon: '📌' }
 }
 

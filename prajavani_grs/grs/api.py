@@ -78,13 +78,39 @@ def _compute_steps(grievance, has_atr):
     return steps
 
 
-def _build_timeline(grievance_name, status):
+def _build_timeline(grievance):
+    """Build a chronological list of events for a grievance."""
     events = []
 
-    # ATR actions
+    # 1. Always: complaint filed
+    events.append({
+        "date":    str(grievance.get("filing_date") or ""),
+        "type":    "filed",
+        "title":   "Complaint Filed",
+        "officer": "",
+        "details": {
+            "Department": grievance.get("department", ""),
+            "Category":   grievance.get("category", ""),
+            "Channel":    "Online",
+        },
+    })
+
+    # 2. Officer assigned (if applicable)
+    assignment_date = grievance.get("assignment_date")
+    officer_name    = grievance.get("assigned_officer_name")
+    if assignment_date:
+        events.append({
+            "date":    str(assignment_date),
+            "type":    "assigned",
+            "title":   "Officer Assigned",
+            "officer": officer_name or "",
+            "details": {"Officer": officer_name} if officer_name else {},
+        })
+
+    # 3. ATR actions
     atrs = frappe.db.get_all(
         "ATR Action",
-        filters={"grievance": grievance_name},
+        filters={"grievance": grievance.name},
         fields=["submission_date", "atr_type", "filed_by_name",
                 "citizen_remarks", "forward_to_level",
                 "redressed_in_favour", "expected_resolution_days"],
@@ -108,10 +134,10 @@ def _build_timeline(grievance_name, status):
             "details": details,
         })
 
-    # Appeals
+    # 4. Appeals
     appeals = frappe.db.get_all(
         "Appeal",
-        filters={"linked_grievance": grievance_name},
+        filters={"linked_grievance": grievance.name},
         fields=["filing_date", "appeal_level", "reason_for_appeal", "status", "name"],
         order_by="filing_date asc",
     )
@@ -225,7 +251,7 @@ def track_grievance(registration_no):
         "can_appeal":      grievance.status in ("Closed",) and not frappe.db.get_value(
                                "Appeal", {"linked_grievance": grievance.name}, "name"),
         "steps":           _compute_steps(grievance, has_atr),
-        "timeline":        _build_timeline(grievance.name, grievance.status),
+        "timeline":        _build_timeline(grievance),
     }
 
 
