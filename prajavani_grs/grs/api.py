@@ -253,6 +253,12 @@ def track_grievance(registration_no):
         return {"error": "No complaint found. Check your registration number or search by mobile."}
 
     has_atr = bool(frappe.db.get_value("ATR Action", {"grievance": grievance.name}, "name"))
+    # Appeal is only allowed when the officer has filed a Final ATR or Closure ATR
+    has_final_atr = bool(frappe.db.get_value(
+        "ATR Action",
+        {"grievance": grievance.name, "atr_type": ["in", ["Final ATR", "Closure"]]},
+        "name",
+    ))
     status_label, status_desc = STATUS_LABELS.get(grievance.status, (grievance.status, ""))
 
     return {
@@ -267,7 +273,7 @@ def track_grievance(registration_no):
         "status_label":    status_label,
         "status_desc":     status_desc,
         "officer_name":    grievance.assigned_officer_name or "",
-        "can_appeal":      grievance.status in ("Closed",) and not frappe.db.get_value(
+        "can_appeal":      has_final_atr and not frappe.db.get_value(
                                "Appeal", {"linked_grievance": grievance.name}, "name"),
         "steps":           _compute_steps(grievance, has_atr),
         "timeline":        _build_timeline(grievance),

@@ -20,6 +20,7 @@ fixtures = [
 
 scheduler_events = {
     "daily": [
+        "prajavani_grs.grs.tasks.daily.auto_escalate_grievances",
         "prajavani_grs.grs.tasks.daily.check_sla_breaches",
         "prajavani_grs.grs.tasks.daily.send_daily_digest",
     ],
