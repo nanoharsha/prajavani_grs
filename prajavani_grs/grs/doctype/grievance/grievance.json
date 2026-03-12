@@ -8,7 +8,7 @@
   {"fieldname": "registration_no",             "fieldtype": "Data",          "label": "Registration Number",           "read_only": 1, "in_list_view": 1, "in_standard_filter": 1, "bold": 1},
   {"fieldname": "filing_date",                 "fieldtype": "Date",          "label": "Date of Filing",                "reqd": 1, "default": "Today", "in_list_view": 1},
   {"fieldname": "channel",                     "fieldtype": "Select",        "label": "Registration Channel",          "reqd": 1, "in_standard_filter": 1,
-   "options": "\nOnline\nState Level Desk\nDistrict Level Prajavani\nMandal Level Desk"},
+   "options": "\nOnline\nPrajavani\nState Level Desk\nDistrict Level Prajavani\nMandal Level Desk"},
   {"fieldname": "registration_level",          "fieldtype": "Select",        "label": "Registration Level",            "reqd": 1, "options": "\nState\nDistrict\nMandal"},
   {"fieldname": "col1",                        "fieldtype": "Column Break"},
   {"fieldname": "status",                      "fieldtype": "Select",        "label": "Status",                        "reqd": 1, "default": "New", "in_list_view": 1, "in_standard_filter": 1, "bold": 1,
@@ -51,8 +51,9 @@
  ],
  "icon": "fa fa-file-text",
  "links": [
-  {"link_doctype": "ATR Action", "link_fieldname": "grievance"},
-  {"link_doctype": "Appeal",     "link_fieldname": "linked_grievance"}
+  {"link_doctype": "ATR Action",           "link_fieldname": "grievance"},
+  {"link_doctype": "Appeal",               "link_fieldname": "linked_grievance"},
+  {"link_doctype": "Prajavani Attendance", "link_fieldname": "grievance"}
  ],
  "modified": "2026-03-01 00:00:00",
  "modified_by": "Administrator",

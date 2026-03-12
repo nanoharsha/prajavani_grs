@@ -15,11 +15,13 @@ fixtures = [
     {"dt": "GRS Department"},
     {"dt": "GRS Category"},
     {"dt": "GRS Sub Category"},
+    {"dt": "Print Format", "filters": [["doc_type", "=", "Prajavani Attendance"]]},
 ]
 
 
 scheduler_events = {
     "daily": [
+        "prajavani_grs.grs.tasks.daily.auto_escalate_grievances",
         "prajavani_grs.grs.tasks.daily.check_sla_breaches",
         "prajavani_grs.grs.tasks.daily.send_daily_digest",
     ],
