@@ -78,13 +78,39 @@ def _compute_steps(grievance, has_atr):
     return steps
 
 
-def _build_timeline(grievance_name, status):
+def _build_timeline(grievance):
+    """Build a chronological list of events for a grievance."""
     events = []
 
-    # ATR actions
+    # 1. Always: complaint filed
+    events.append({
+        "date":    str(grievance.get("filing_date") or ""),
+        "type":    "filed",
+        "title":   "Complaint Filed",
+        "officer": "",
+        "details": {
+            "Department": grievance.get("department", ""),
+            "Category":   grievance.get("category", ""),
+            "Channel":    "Online",
+        },
+    })
+
+    # 2. Officer assigned (if applicable)
+    assignment_date = grievance.get("assignment_date")
+    officer_name    = grievance.get("assigned_officer_name")
+    if assignment_date:
+        events.append({
+            "date":    str(assignment_date),
+            "type":    "assigned",
+            "title":   "Officer Assigned",
+            "officer": officer_name or "",
+            "details": {"Officer": officer_name} if officer_name else {},
+        })
+
+    # 3. ATR actions
     atrs = frappe.db.get_all(
         "ATR Action",
-        filters={"grievance": grievance_name},
+        filters={"grievance": grievance.name},
         fields=["submission_date", "atr_type", "filed_by_name",
                 "citizen_remarks", "forward_to_level",
                 "redressed_in_favour", "expected_resolution_days"],
@@ -108,10 +134,10 @@ def _build_timeline(grievance_name, status):
             "details": details,
         })
 
-    # Appeals
+    # 4. Appeals
     appeals = frappe.db.get_all(
         "Appeal",
-        filters={"linked_grievance": grievance_name},
+        filters={"linked_grievance": grievance.name},
         fields=["filing_date", "appeal_level", "reason_for_appeal", "status", "name"],
         order_by="filing_date asc",
     )
@@ -142,23 +168,70 @@ def _build_timeline(grievance_name, status):
 
 @frappe.whitelist(allow_guest=True)
 def track_grievance(registration_no):
-    """Public endpoint: citizen tracks their complaint by registration number."""
-    registration_no = (registration_no or "").strip()
-    if not registration_no:
-        return {"error": "Please enter a registration number."}
+    """Public endpoint: citizen tracks their complaint.
+
+    Accepts either a registration number (GRS/YYYY/…) or a 10-digit
+    mobile number.  When a mobile number is supplied, all grievances
+    filed from that number are returned as a summary list so the
+    citizen can pick the one they want to inspect.
+    """
+    query = (registration_no or "").strip()
+    if not query:
+        return {"error": "Please enter a registration number or mobile number."}
+
+    # ── Mobile-number search ──────────────────────────────────────────────────
+    if query.isdigit() and len(query) == 10:
+        citizen_names = frappe.db.get_all(
+            "Citizen",
+            filters={"mobile_number": query},
+            pluck="name",
+        )
+        if not citizen_names:
+            return {"error": "No complaints found for this mobile number."}
+
+        grievances = frappe.db.get_all(
+            "Grievance",
+            filters={"citizen": ["in", citizen_names]},
+            fields=["name", "registration_no", "filing_date",
+                    "department", "category", "status"],
+            order_by="filing_date desc",
+        )
+        if not grievances:
+            return {"error": "No complaints found for this mobile number."}
+
+        # Return a list so the UI can display a picker
+        summary = []
+        for g in grievances:
+            label, _ = STATUS_LABELS.get(g.status, (g.status, ""))
+            summary.append({
+                "registration_no": g.registration_no or g.name,
+                "filing_date":     str(g.filing_date or ""),
+                "department":      g.department,
+                "category":        g.category,
+                "status":          g.status,
+                "status_label":    label,
+            })
+        return {"grievances": summary}
+
+    # ── Registration-number search ────────────────────────────────────────────
+    FIELDS = ["name", "status", "filing_date", "department", "category",
+              "gist_of_grievance", "assigned_officer_name",
+              "assignment_date", "citizen_name", "registration_no",
+              "days_pending"]
 
     grievance = frappe.db.get_value(
         "Grievance",
-        {"registration_no": registration_no},
-        ["name", "status", "filing_date", "department", "category",
-         "gist_of_grievance", "assigned_officer_name",
-         "assignment_date", "citizen_name", "registration_no",
-         "days_pending"],
+        {"registration_no": query},
+        FIELDS,
         as_dict=True,
     )
 
+    # Fallback: the caller might have the raw document name (e.g. GRS-2026-00001)
     if not grievance:
-        return {"error": "No complaint found with this registration number. Please check and try again."}
+        grievance = frappe.db.get_value("Grievance", query, FIELDS, as_dict=True)
+
+    if not grievance:
+        return {"error": "No complaint found. Check your registration number or search by mobile."}
 
     has_atr = bool(frappe.db.get_value("ATR Action", {"grievance": grievance.name}, "name"))
     status_label, status_desc = STATUS_LABELS.get(grievance.status, (grievance.status, ""))
@@ -178,7 +251,7 @@ def track_grievance(registration_no):
         "can_appeal":      grievance.status in ("Closed",) and not frappe.db.get_value(
                                "Appeal", {"linked_grievance": grievance.name}, "name"),
         "steps":           _compute_steps(grievance, has_atr),
-        "timeline":        _build_timeline(grievance.name, grievance.status),
+        "timeline":        _build_timeline(grievance),
     }
 
 
