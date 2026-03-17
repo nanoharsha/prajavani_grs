@@ -1,0 +1,43 @@
+{
+ "autoname": "CAL-.YYYY.-.#####",
+ "creation": "2026-03-17 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "fields": [
+  {"fieldname": "title",             "fieldtype": "Data",         "label": "Event Title",              "reqd": 1, "in_list_view": 1, "bold": 1},
+  {"fieldname": "event_type",        "fieldtype": "Select",       "label": "Event Type",               "reqd": 1, "in_list_view": 1, "in_standard_filter": 1,
+   "options": "\nPrajavani\nAppeal Hearing\nRegular Review"},
+  {"fieldname": "event_date",        "fieldtype": "Date",         "label": "Event Date",               "reqd": 1, "in_list_view": 1, "in_standard_filter": 1},
+  {"fieldname": "event_time",        "fieldtype": "Time",         "label": "Event Time"},
+  {"fieldname": "col1",              "fieldtype": "Column Break"},
+  {"fieldname": "level",             "fieldtype": "Select",       "label": "Level",                    "reqd": 1, "in_list_view": 1, "in_standard_filter": 1,
+   "options": "\nMandal\nDistrict\nState"},
+  {"fieldname": "district",          "fieldtype": "Link",         "label": "District",                 "options": "GRS District",
+   "depends_on": "eval:doc.level != 'State'"},
+  {"fieldname": "mandal",            "fieldtype": "Link",         "label": "Mandal",                   "options": "GRS Mandal",
+   "depends_on": "eval:doc.level == 'Mandal'"},
+  {"fieldname": "venue",             "fieldtype": "Data",         "label": "Venue / Location"},
+  {"fieldname": "presiding_officer", "fieldtype": "Link",         "label": "Presiding Officer",        "options": "GRO Officer"},
+  {"fieldname": "max_cases",         "fieldtype": "Int",          "label": "Max Cases per Session",    "default": "50"},
+  {"fieldname": "status",            "fieldtype": "Select",       "label": "Status",                   "default": "Scheduled", "in_list_view": 1, "in_standard_filter": 1,
+   "options": "Scheduled\nCompleted\nCancelled"},
+  {"fieldname": "notes",             "fieldtype": "Text",         "label": "Notes / Agenda"},
+  {"fieldname": "sec_grievances",    "fieldtype": "Section Break","label": "Scheduled Grievances"},
+  {"fieldname": "scheduled_grievances", "fieldtype": "Table",     "label": "Scheduled Grievances",     "options": "Appeal Calendar Grievance"}
+ ],
+ "icon": "fa fa-calendar",
+ "modified": "2026-03-17 00:00:00",
+ "modified_by": "Administrator",
+ "module": "GRS",
+ "name": "Appeal Calendar",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "delete": 0, "email": 1, "print": 1, "read": 1, "write": 1, "role": "GRS Operator"},
+  {"read": 1, "print": 1, "role": "GRS Officer"},
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "share": 1, "write": 1, "role": "GRS Admin"}
+ ],
+ "sort_field": "event_date",
+ "sort_order": "ASC",
+ "title_field": "title",
+ "track_changes": 1
+}
