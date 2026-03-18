@@ -58,17 +58,19 @@
   },
   {
    "fieldname": "district",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "label": "District",
    "reqd": 1,
    "in_list_view": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "options": "GRS District"
   },
   {
    "fieldname": "mandal_ward",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "label": "Mandal / Ward",
-   "reqd": 0
+   "reqd": 0,
+   "options": "GRS Mandal"
   },
   {
    "fieldname": "address",

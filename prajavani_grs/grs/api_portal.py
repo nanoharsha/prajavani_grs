@@ -219,7 +219,7 @@ def create_grievance(full_name, mobile, district, department, category, gist,
             cit.gender = gender
         cit.is_senior_citizen = int(is_senior)
         cit.is_pwd = int(is_pwd)
-        cit.save(ignore_permissions=True, ignore_mandatory=True)
+        cit.save(ignore_permissions=True)
     else:
         cit = frappe.get_doc({
             "doctype": "Citizen",
@@ -227,13 +227,13 @@ def create_grievance(full_name, mobile, district, department, category, gist,
             "mobile_number": mobile,
             "gender": gender or "Male",
             "district": district,
-            "mandal_ward": mandal or "",
+            "mandal_ward": mandal or None,
             "aadhaar_last4": "0000",
             "address": f"{mandal or district}",
             "is_senior_citizen": int(is_senior),
             "is_pwd": int(is_pwd),
         })
-        cit.insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
+        cit.insert(ignore_permissions=True, ignore_mandatory=True)
         citizen_name = cit.name
 
     g = frappe.get_doc({
