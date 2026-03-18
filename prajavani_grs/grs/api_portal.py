@@ -22,12 +22,12 @@ def _roles():
 
 def _is_operator():
     r = _roles()
-    return "GRS Operator" in r or "GRS Admin" in r
+    return "GRS Operator" in r or "GRS Admin" in r or "System Manager" in r or "Administrator" == frappe.session.user
 
 
 def _is_officer():
     r = _roles()
-    return "GRS Officer" in r or "GRS Appellate Authority" in r or "GRS Admin" in r
+    return "GRS Officer" in r or "GRS Appellate Authority" in r or "GRS Admin" in r or "System Manager" in r or "Administrator" == frappe.session.user
 
 
 def _get_officer_record():
