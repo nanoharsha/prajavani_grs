@@ -22,12 +22,12 @@ def _roles():
 
 def _is_operator():
     r = _roles()
-    return "GRS Operator" in r or "GRS Admin" in r
+    return "GRS Operator" in r or "GRS Admin" in r or "System Manager" in r or "Administrator" == frappe.session.user
 
 
 def _is_officer():
     r = _roles()
-    return "GRS Officer" in r or "GRS Appellate Authority" in r or "GRS Admin" in r
+    return "GRS Officer" in r or "GRS Appellate Authority" in r or "GRS Admin" in r or "System Manager" in r or "Administrator" == frappe.session.user
 
 
 def _get_officer_record():
@@ -241,6 +241,7 @@ def create_grievance(full_name, mobile, district, department, category, gist,
         "filing_date": frappe.utils.today(),
         "channel": channel,
         "registration_level": registration_level,
+        "district": district,
         "status": "New",
         "grievance_type": "Group" if int(is_group) else "Individual",
         "group_members_count": int(group_count) if group_count and int(is_group) else None,
