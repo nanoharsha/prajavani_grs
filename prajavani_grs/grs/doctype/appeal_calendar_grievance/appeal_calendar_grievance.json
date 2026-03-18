@@ -1,0 +1,22 @@
+{
+ "creation": "2026-03-17 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "fields": [
+  {"fieldname": "grievance",          "fieldtype": "Link",      "label": "Grievance ID",       "reqd": 1, "options": "Grievance", "in_list_view": 1, "bold": 1},
+  {"fieldname": "registration_no",    "fieldtype": "Data",      "label": "Reg. No.",           "fetch_from": "grievance.registration_no", "read_only": 1, "in_list_view": 1},
+  {"fieldname": "citizen_name",       "fieldtype": "Data",      "label": "Citizen Name",       "in_list_view": 1},
+  {"fieldname": "department",         "fieldtype": "Data",      "label": "Department",         "in_list_view": 1},
+  {"fieldname": "gist",               "fieldtype": "Small Text","label": "Gist"},
+  {"fieldname": "assigned_officer",   "fieldtype": "Link",      "label": "Officer to Attend",  "options": "GRO Officer", "in_list_view": 1},
+  {"fieldname": "officer_notified",   "fieldtype": "Check",     "label": "Officer Notified",   "in_list_view": 1},
+  {"fieldname": "notification_sent_on","fieldtype": "Datetime", "label": "Notified On",        "read_only": 1}
+ ],
+ "istable": 1,
+ "modified": "2026-03-17 00:00:00",
+ "modified_by": "Administrator",
+ "module": "GRS",
+ "name": "Appeal Calendar Grievance",
+ "owner": "Administrator",
+ "permissions": []
+}

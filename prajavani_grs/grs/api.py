@@ -135,14 +135,17 @@ def _build_timeline(grievance):
         })
 
     # 4. Prajavani attendances (multiple allowed)
-    praj_list = frappe.db.get_all(
-        "Prajavani Attendance",
-        filters={"grievance": grievance.name},
-        fields=["prajavani_date", "prajavani_level", "location",
-                "attending_officer_name", "nodal_officer_name",
-                "citizen_present", "gro_remarks", "citizen_remarks", "name"],
-        order_by="prajavani_date asc",
-    )
+    try:
+        praj_list = frappe.db.get_all(
+            "Prajavani Attendance",
+            filters={"grievance": grievance.name},
+            fields=["prajavani_date", "prajavani_level", "location",
+                    "attending_officer_name", "nodal_officer_name",
+                    "citizen_present", "gro_remarks", "citizen_remarks", "name"],
+            order_by="prajavani_date asc",
+        )
+    except Exception:
+        praj_list = []
     for pa in praj_list:
         details = {
             "Level":    pa.prajavani_level,

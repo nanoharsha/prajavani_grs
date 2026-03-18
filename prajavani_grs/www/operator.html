@@ -1,0 +1,1270 @@
+{% raw %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prajavani GRS – Operator Portal</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue-router@4.3.0/dist/vue-router.global.prod.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',500:'#1a56db',600:'#1e40af',700:'#1e3a8a' }
+          },
+          fontFamily: { sans: ['Inter','system-ui','sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    [v-cloak] { display: none; }
+    .fade-enter-active, .fade-leave-active { transition: opacity 0.15s; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; }
+    .slide-enter-active, .slide-leave-active { transition: all 0.2s; }
+    .slide-enter-from { transform: translateX(20px); opacity: 0; }
+  </style>
+</head>
+<body class="bg-gray-50 font-sans antialiased">
+<div id="app" v-cloak></div>
+
+<script>
+const { createApp, ref, reactive, computed, onMounted, watch } = Vue
+const { createRouter, createWebHashHistory, RouterView, RouterLink, useRoute, useRouter } = VueRouter
+
+// ── API ────────────────────────────────────────────────────────────────────
+const BASE_PUB  = '/api/method/prajavani_grs.grs.api'
+const BASE_PRIV = '/api/method/prajavani_grs.grs.api_portal'
+
+function csrfToken() {
+  return (typeof frappe !== 'undefined' && frappe.csrf_token) ? frappe.csrf_token : 'fetch'
+}
+
+async function apicall(base, method, params = {}) {
+  const url = new URL(`${base}.${method}`, location.origin)
+  Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v) })
+  const res = await fetch(url, { headers: { Accept: 'application/json', 'X-Frappe-CSRF-Token': csrfToken() } })
+  const data = await res.json()
+  if (data.exc) throw new Error(data.exc)
+  return data.message
+}
+
+async function apipost(base, method, params = {}) {
+  const url = `${base}.${method}`
+  const body = new URLSearchParams()
+  Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') body.set(k, v) })
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'X-Frappe-CSRF-Token': csrfToken() },
+    body,
+  })
+  const data = await res.json()
+  if (data.exc) throw new Error(data.exc)
+  return data.message
+}
+
+const api = {
+  getUserInfo:             ()          => apicall(BASE_PRIV, 'get_user_info'),
+  getDashboardStats:       ()          => apicall(BASE_PRIV, 'get_dashboard_stats'),
+  getGrievanceList:        (p)         => apicall(BASE_PRIV, 'get_grievance_list', p),
+  getGrievanceDetail:      (id)        => apicall(BASE_PRIV, 'get_grievance_detail', { grievance_id: id }),
+  getOfficerSuggestions:   (p)         => apicall(BASE_PRIV, 'get_officer_suggestions', p),
+  assignOfficer:           (gid, oid)  => apipost(BASE_PRIV, 'assign_officer_to_grievance', { grievance_id: gid, officer_id: oid }),
+  createGrievance:         (p)         => apipost(BASE_PRIV, 'create_grievance', p),
+  addPrajavaniAttendance:  (p)         => apipost(BASE_PRIV, 'add_prajavani_attendance', p),
+  fileAppealOperator:      (p)         => apipost(BASE_PRIV, 'file_appeal_operator', p),
+  getCalendarEvents:       (p)         => apicall(BASE_PRIV, 'get_calendar_events', p),
+  createCalendarEvent:     (p)         => apipost(BASE_PRIV, 'create_calendar_event', p),
+  getMyCases:              (p)         => apicall(BASE_PRIV, 'get_my_officer_cases', p),
+  submitATR:               (p)         => apipost(BASE_PRIV, 'submit_atr', p),
+  getDepartments:          ()          => apicall(BASE_PUB,  'get_departments'),
+  getCategories:           (dep)       => apicall(BASE_PUB,  'get_categories', { department: dep }),
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function fmtDate(d) {
+  if (!d) return '—'
+  try { return new Date(d).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) }
+  catch { return d }
+}
+
+const STATUS_BADGE = {
+  'New':            'bg-gray-100 text-gray-700',
+  'Assigned':       'bg-blue-100 text-blue-700',
+  'Accepted':       'bg-indigo-100 text-indigo-700',
+  'Under Enquiry':  'bg-purple-100 text-purple-700',
+  'Interim Reply':  'bg-amber-100 text-amber-800',
+  'Sub-Judice':     'bg-red-100 text-red-700',
+  'Policy Awaited': 'bg-orange-100 text-orange-700',
+  'Closed':         'bg-green-100 text-green-700',
+  'Appeal Filed':   'bg-amber-100 text-amber-700',
+}
+function badgeCls(s) {
+  return `text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_BADGE[s] || 'bg-gray-100 text-gray-600'}`
+}
+
+// ── Shared state ───────────────────────────────────────────────────────────
+const userInfo = ref(null)
+const toast    = reactive({ show: false, msg: '', type: 'success' })
+
+function showToast(msg, type = 'success') {
+  toast.msg = msg; toast.type = type; toast.show = true
+  setTimeout(() => toast.show = false, 3200)
+}
+
+// ── Toast component ────────────────────────────────────────────────────────
+const Toast = {
+  setup() { return { toast } },
+  template: `
+  <transition name="slide">
+    <div v-if="toast.show"
+      :class="['fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white',
+               toast.type === 'error' ? 'bg-red-500' : 'bg-green-600']">
+      {{ toast.msg }}
+    </div>
+  </transition>`
+}
+
+// ── Sidebar ────────────────────────────────────────────────────────────────
+const Sidebar = {
+  setup() {
+    const route = useRoute()
+    const nav = computed(() => {
+      const base = [
+        { to: '/',           icon: '🏠', label: 'Dashboard' },
+        { to: '/grievances', icon: '📋', label: 'Grievances' },
+        { to: '/new',        icon: '➕', label: 'New Grievance' },
+        { to: '/calendar',   icon: '📅', label: 'Appeal Calendar' },
+      ]
+      if (userInfo.value?.is_officer || userInfo.value?.is_admin) {
+        base.splice(3, 0, { to: '/my-cases', icon: '👤', label: 'My Cases' })
+      }
+      return base
+    })
+    return { nav, route, userInfo }
+  },
+  template: `
+  <aside class="hidden sm:flex flex-col w-56 bg-white border-r border-gray-200 min-h-screen flex-shrink-0">
+    <div class="h-14 flex items-center gap-2 px-4 border-b border-gray-100">
+      <span class="text-xl">🏛</span>
+      <div>
+        <p class="font-bold text-gray-900 text-sm leading-tight">Prajavani <span class="text-brand-500">GRS</span></p>
+        <p class="text-xs text-gray-400">Staff Portal</p>
+      </div>
+    </div>
+    <nav class="flex-1 py-4 px-2">
+      <RouterLink v-for="n in nav" :key="n.to" :to="n.to"
+        :class="['flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium mb-0.5 transition-colors',
+          route.path === n.to
+            ? 'bg-brand-50 text-brand-600'
+            : 'text-gray-600 hover:bg-gray-100']">
+        <span class="text-base w-5 text-center">{{ n.icon }}</span>
+        {{ n.label }}
+      </RouterLink>
+    </nav>
+    <div v-if="userInfo" class="px-4 py-3 border-t border-gray-100">
+      <p class="text-xs font-semibold text-gray-700 truncate">{{ userInfo.full_name }}</p>
+      <p class="text-xs text-gray-400 mt-0.5">{{ userInfo.officer?.designation || (userInfo.is_operator ? 'Operator' : 'Staff') }}</p>
+      <a href="/api/method/logout" class="text-xs text-red-500 hover:underline mt-1 inline-block">Sign out</a>
+    </div>
+  </aside>`
+}
+
+// ── TopBar ─────────────────────────────────────────────────────────────────
+const TopBar = {
+  props: ['title'],
+  setup() { return { userInfo } },
+  template: `
+  <header class="h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-3 sticky top-0 z-10">
+    <h1 class="text-base font-bold text-gray-800 flex-1">{{ title }}</h1>
+    <a href="/app" class="text-xs text-brand-500 font-medium hover:underline hidden sm:block">Frappe Desk ↗</a>
+  </header>`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard
+// ─────────────────────────────────────────────────────────────────────────────
+const Dashboard = {
+  components: { Sidebar, TopBar, Toast },
+  setup() {
+    const stats   = ref(null)
+    const loading = ref(true)
+    onMounted(async () => {
+      try { stats.value = await api.getDashboardStats() } catch {}
+      finally { loading.value = false }
+    })
+    const cards = computed(() => {
+      if (!stats.value) return []
+      const s = stats.value
+      return [
+        { label: 'Total Grievances',  value: s.total,            color: 'bg-blue-50 text-blue-700',    icon: '📋' },
+        { label: 'New / Pending',     value: s.new,              color: 'bg-gray-50 text-gray-700',    icon: '🆕' },
+        { label: 'Under Enquiry',     value: s.under_enquiry,    color: 'bg-indigo-50 text-indigo-700',icon: '🔍' },
+        { label: 'Overdue (>30 d)',   value: s.overdue,          color: 'bg-red-50 text-red-700',      icon: '⚠️' },
+        { label: 'Resolved',          value: s.closed,           color: 'bg-green-50 text-green-700',  icon: '✅' },
+        { label: 'Active Appeals',    value: s.appeals,          color: 'bg-amber-50 text-amber-700',  icon: '⚖️' },
+        { label: "Today's Prajavani", value: s.todays_prajavani, color: 'bg-purple-50 text-purple-700',icon: '🏛' },
+        { label: 'Upcoming Events',   value: s.upcoming_events,  color: 'bg-teal-50 text-teal-700',   icon: '📅' },
+      ]
+    })
+    return { stats, loading, cards }
+  },
+  template: `
+  <div class="flex min-h-screen">
+    <Sidebar /><Toast />
+    <div class="flex-1 flex flex-col">
+      <TopBar title="Dashboard" />
+      <main class="flex-1 p-4 sm:p-6">
+        <div v-if="loading" class="text-center py-16 text-gray-400">Loading…</div>
+        <template v-else>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <div v-for="c in cards" :key="c.label"
+              :class="['rounded-xl border border-transparent p-4 flex flex-col gap-1', c.color]">
+              <span class="text-2xl">{{ c.icon }}</span>
+              <span class="text-2xl font-bold">{{ c.value ?? '—' }}</span>
+              <span class="text-xs font-medium opacity-70">{{ c.label }}</span>
+            </div>
+          </div>
+          <template v-if="stats?.my_pending !== undefined">
+            <h3 class="font-semibold text-gray-700 mb-3 text-sm">My Cases</h3>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+              <div class="bg-white rounded-xl border border-gray-200 p-4">
+                <p class="text-2xl font-bold text-gray-900">{{ stats.my_pending }}</p>
+                <p class="text-xs text-gray-500 mt-1">Pending</p>
+              </div>
+              <div class="bg-white rounded-xl border border-red-100 p-4">
+                <p class="text-2xl font-bold text-red-600">{{ stats.my_overdue }}</p>
+                <p class="text-xs text-gray-500 mt-1">Overdue</p>
+              </div>
+            </div>
+          </template>
+          <div class="flex gap-3 flex-wrap">
+            <RouterLink to="/grievances"
+              class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold hover:bg-brand-600 transition-colors">
+              All Grievances →
+            </RouterLink>
+            <RouterLink to="/new"
+              class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors">
+              + New Grievance
+            </RouterLink>
+          </div>
+        </template>
+      </main>
+    </div>
+  </div>`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Grievance List
+// ─────────────────────────────────────────────────────────────────────────────
+const GrievanceList = {
+  components: { Sidebar, TopBar, Toast },
+  setup() {
+    const router       = useRouter()
+    const items        = ref([])
+    const total        = ref(0)
+    const page         = ref(1)
+    const loading      = ref(false)
+    const search       = ref('')
+    const filterStatus = ref('')
+
+    const STATUSES = ['New','Assigned','Accepted','Under Enquiry','Interim Reply','Sub-Judice','Policy Awaited','Closed']
+
+    async function load() {
+      loading.value = true
+      try {
+        const res = await api.getGrievanceList({
+          page: page.value, per_page: 25,
+          status: filterStatus.value || undefined,
+          search: search.value || undefined,
+        })
+        items.value = res.data || []
+        total.value = res.total || 0
+      } catch { showToast('Failed to load', 'error') }
+      finally { loading.value = false }
+    }
+
+    onMounted(load)
+    watch([filterStatus, search], () => { page.value = 1; load() })
+
+    const totalPages = computed(() => Math.ceil(total.value / 25))
+    function prev() { if (page.value > 1) { page.value--; load() } }
+    function next() { if (page.value < totalPages.value) { page.value++; load() } }
+
+    return { items, total, page, totalPages, loading, search, filterStatus, STATUSES,
+             prev, next, badgeCls, fmtDate, open: (n) => router.push(`/grievances/${n}`) }
+  },
+  template: `
+  <div class="flex min-h-screen">
+    <Sidebar /><Toast />
+    <div class="flex-1 flex flex-col">
+      <TopBar title="Grievances" />
+      <main class="flex-1 p-4 sm:p-6">
+        <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex flex-wrap gap-3 items-center">
+          <input v-model="search" type="text" placeholder="Search name or registration no…"
+            class="flex-1 min-w-[180px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          <select v-model="filterStatus"
+            class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="">All Statuses</option>
+            <option v-for="s in STATUSES" :key="s">{{ s }}</option>
+          </select>
+          <RouterLink to="/new"
+            class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold hover:bg-brand-600 whitespace-nowrap transition-colors">
+            + New
+          </RouterLink>
+        </div>
+
+        <div v-if="loading" class="text-center py-16 text-gray-400">Loading…</div>
+        <template v-else>
+          <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Reg No</th>
+                  <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Citizen</th>
+                  <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Department</th>
+                  <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                  <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Days</th>
+                  <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Filed</th>
+                  <th class="px-4 py-3 w-10"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr v-if="!items.length">
+                  <td colspan="7" class="text-center py-12 text-gray-400">No grievances found.</td>
+                </tr>
+                <tr v-for="g in items" :key="g.name"
+                  class="hover:bg-gray-50 cursor-pointer transition-colors"
+                  @click="open(g.name)">
+                  <td class="px-4 py-3">
+                    <p class="font-mono text-xs text-gray-500">{{ g.registration_no || g.name }}</p>
+                    <p v-if="g.is_emergency" class="text-red-500 text-xs font-semibold mt-0.5">⚡ Emergency</p>
+                  </td>
+                  <td class="px-4 py-3 hidden sm:table-cell text-gray-700">{{ g.citizen_name || '—' }}</td>
+                  <td class="px-4 py-3 hidden md:table-cell text-gray-500 text-xs">{{ g.department }}</td>
+                  <td class="px-4 py-3"><span :class="badgeCls(g.status)">{{ g.status }}</span></td>
+                  <td class="px-4 py-3 hidden lg:table-cell">
+                    <span :class="['text-xs font-semibold',
+                      g.days_pending > 30 ? 'text-red-600' :
+                      g.days_pending > 15 ? 'text-amber-600' : 'text-gray-500']">
+                      {{ g.days_pending }}d
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 hidden md:table-cell text-gray-400 text-xs">{{ fmtDate(g.filing_date) }}</td>
+                  <td class="px-4 py-3 text-brand-500 text-xs font-medium">→</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-if="totalPages > 1" class="flex items-center justify-between mt-4 text-sm text-gray-500">
+            <span>{{ total }} total · Page {{ page }} of {{ totalPages }}</span>
+            <div class="flex gap-2">
+              <button @click="prev" :disabled="page <= 1"
+                class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50 transition-colors">← Prev</button>
+              <button @click="next" :disabled="page >= totalPages"
+                class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50 transition-colors">Next →</button>
+            </div>
+          </div>
+        </template>
+      </main>
+    </div>
+  </div>`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Grievance Detail
+// ─────────────────────────────────────────────────────────────────────────────
+const GrievanceDetail = {
+  components: { Sidebar, TopBar, Toast },
+  setup() {
+    const route    = useRoute()
+    const data     = ref(null)
+    const loading  = ref(true)
+    const officers = ref([])
+    const selOfficer   = ref('')
+    const assigning    = ref(false)
+
+    // Panels
+    const showATR    = ref(false)
+    const showPraj   = ref(false)
+    const showAppeal = ref(false)
+
+    // ATR form
+    const ATR_TYPES = ['Interim Reply','ATR for Further Action','Final ATR','Sub-Judice','Policy Decision Awaited','Closure']
+    const atrForm = reactive({ atr_type:'', atr_remarks:'', citizen_remarks:'', citizen_contacted:0 })
+    const atrBusy = ref(false)
+
+    // Prajavani form
+    const prajForm = reactive({ prajavani_date:'', prajavani_level:'Mandal', location:'', citizen_present:1, gro_remarks:'' })
+    const prajBusy = ref(false)
+
+    // Appeal form
+    const appForm = reactive({ reason_for_appeal:'', detailed_explanation:'', appeal_level:'District' })
+    const appBusy = ref(false)
+
+    async function load() {
+      loading.value = true
+      try { data.value = await api.getGrievanceDetail(route.params.id) }
+      catch { showToast('Failed to load grievance', 'error') }
+      finally { loading.value = false }
+    }
+
+    async function loadOfficers() {
+      const g = data.value?.grievance
+      try {
+        officers.value = await api.getOfficerSuggestions({
+          district: g?.district, department: g?.department,
+        })
+      } catch {}
+    }
+
+    onMounted(load)
+
+    async function assign() {
+      if (!selOfficer.value) return
+      assigning.value = true
+      try {
+        await api.assignOfficer(route.params.id, selOfficer.value)
+        showToast('Officer assigned'); selOfficer.value = ''; await load()
+      } catch { showToast('Assignment failed', 'error') }
+      finally { assigning.value = false }
+    }
+
+    async function submitATR() {
+      if (!atrForm.atr_type || !atrForm.atr_remarks) return
+      atrBusy.value = true
+      try {
+        await api.submitATR({ grievance_id: route.params.id, ...atrForm })
+        showToast('ATR submitted'); showATR.value = false
+        Object.assign(atrForm, { atr_type:'', atr_remarks:'', citizen_remarks:'', citizen_contacted:0 })
+        await load()
+      } catch { showToast('ATR failed', 'error') }
+      finally { atrBusy.value = false }
+    }
+
+    async function addPraj() {
+      if (!prajForm.prajavani_date) return
+      prajBusy.value = true
+      try {
+        await api.addPrajavaniAttendance({ grievance_id: route.params.id, ...prajForm })
+        showToast('Hearing recorded'); showPraj.value = false
+        Object.assign(prajForm, { prajavani_date:'', prajavani_level:'Mandal', location:'', citizen_present:1, gro_remarks:'' })
+        await load()
+      } catch { showToast('Failed to record hearing', 'error') }
+      finally { prajBusy.value = false }
+    }
+
+    async function fileAppeal() {
+      if (!appForm.reason_for_appeal || !appForm.detailed_explanation) return
+      appBusy.value = true
+      try {
+        await api.fileAppealOperator({ grievance_id: route.params.id, ...appForm })
+        showToast('Appeal filed'); showAppeal.value = false
+        Object.assign(appForm, { reason_for_appeal:'', detailed_explanation:'', appeal_level:'District' })
+        await load()
+      } catch { showToast('Appeal filing failed', 'error') }
+      finally { appBusy.value = false }
+    }
+
+    const canAppeal = computed(() => {
+      if (!data.value) return false
+      const hasFinal = (data.value.atrs || []).some(a => ['Final ATR','Closure'].includes(a.atr_type))
+      const noAppeal = !(data.value.appeals?.length)
+      return hasFinal && noAppeal
+    })
+
+    return {
+      data, loading, officers, selOfficer, assigning, loadOfficers, assign,
+      showATR, ATR_TYPES, atrForm, atrBusy, submitATR,
+      showPraj, prajForm, prajBusy, addPraj,
+      showAppeal, appForm, appBusy, fileAppeal,
+      canAppeal, badgeCls, fmtDate, userInfo,
+    }
+  },
+  template: `
+  <div class="flex min-h-screen">
+    <Sidebar /><Toast />
+    <div class="flex-1 flex flex-col">
+      <TopBar :title="data?.grievance?.registration_no || 'Grievance'" />
+      <main class="flex-1 p-4 sm:p-6 max-w-3xl">
+        <RouterLink to="/grievances" class="text-sm text-brand-500 hover:underline mb-4 inline-block">← Back</RouterLink>
+
+        <div v-if="loading" class="text-center py-16 text-gray-400">Loading…</div>
+        <template v-else-if="data">
+
+          <!-- Header -->
+          <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <div>
+                <p class="font-mono text-xs text-gray-400 mb-0.5">{{ data.grievance.registration_no || data.grievance.name }}</p>
+                <h2 class="text-lg font-bold text-gray-900">{{ data.grievance.department }} — {{ data.grievance.category }}</h2>
+                <p class="text-sm text-gray-400 mt-0.5">
+                  Filed {{ fmtDate(data.grievance.filing_date) }} · {{ data.grievance.channel }} · {{ data.grievance.registration_level }}
+                  <span v-if="data.grievance.is_emergency" class="text-red-500 font-semibold ml-1">⚡ Emergency</span>
+                </p>
+              </div>
+              <span :class="badgeCls(data.grievance.status)">{{ data.grievance.status }}</span>
+            </div>
+            <p class="text-sm text-gray-700 bg-gray-50 rounded-lg px-4 py-3 leading-relaxed">{{ data.grievance.gist_of_grievance }}</p>
+            <p class="text-xs text-gray-400 mt-2">Days pending: <strong class="text-gray-700">{{ data.grievance.days_pending }}</strong></p>
+          </div>
+
+          <!-- Citizen -->
+          <div v-if="data.citizen" class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">Citizen</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+              <div><p class="text-xs text-gray-400">Name</p><p class="font-medium">{{ data.citizen.full_name }}</p></div>
+              <div><p class="text-xs text-gray-400">Mobile</p><p class="font-medium">{{ data.citizen.mobile_number }}</p></div>
+              <div><p class="text-xs text-gray-400">District</p><p class="font-medium">{{ data.citizen.district }}</p></div>
+              <div v-if="data.citizen.mandal_ward"><p class="text-xs text-gray-400">Mandal</p><p class="font-medium">{{ data.citizen.mandal_ward }}</p></div>
+              <div v-if="data.citizen.is_senior_citizen" class="col-span-1"><span class="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">Senior Citizen</span></div>
+              <div v-if="data.citizen.is_pwd" class="col-span-1"><span class="text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full">PwD</span></div>
+            </div>
+          </div>
+
+          <!-- Officer assignment -->
+          <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">Officer Assignment</h3>
+            <p v-if="data.grievance.assigned_officer_name" class="text-sm text-gray-700 mb-3">
+              Assigned: <strong>{{ data.grievance.assigned_officer_name }}</strong>
+            </p>
+            <p v-else class="text-sm text-gray-400 mb-3">Not yet assigned.</p>
+            <div v-if="userInfo?.is_operator || userInfo?.is_admin">
+              <button v-if="!officers.length" @click="loadOfficers"
+                class="text-xs text-brand-500 underline">Load officer suggestions</button>
+              <div v-else class="flex gap-2 flex-wrap">
+                <select v-model="selOfficer"
+                  class="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <option value="">Select officer…</option>
+                  <option v-for="o in officers" :key="o.name" :value="o.name">
+                    {{ o.full_name }} ({{ o.level }}, {{ o.district }})
+                  </option>
+                </select>
+                <button @click="assign" :disabled="!selOfficer || assigning"
+                  class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold hover:bg-brand-600 disabled:opacity-50 transition-colors">
+                  {{ assigning ? 'Assigning…' : 'Assign' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ATR Actions -->
+          <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-semibold text-gray-700">ATR Actions</h3>
+              <button v-if="(userInfo?.is_officer || userInfo?.is_admin) && data.grievance.status !== 'Closed'"
+                @click="showATR = !showATR"
+                class="text-xs text-brand-500 font-medium hover:underline">
+                {{ showATR ? 'Cancel' : '+ Submit ATR' }}
+              </button>
+            </div>
+            <div v-if="!data.atrs.length" class="text-sm text-gray-400 mb-3">No ATR actions yet.</div>
+            <div v-else class="space-y-2 mb-3">
+              <div v-for="a in data.atrs" :key="a.name" class="bg-gray-50 rounded-lg p-3 text-sm">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold text-gray-800">{{ a.atr_type }}</span>
+                  <span class="text-xs text-gray-400">{{ fmtDate(a.submission_date) }}</span>
+                </div>
+                <p v-if="a.atr_remarks" class="text-gray-600 mt-1 text-xs">{{ a.atr_remarks }}</p>
+                <p v-if="a.citizen_remarks" class="text-gray-500 text-xs mt-0.5 italic">Citizen message: {{ a.citizen_remarks }}</p>
+              </div>
+            </div>
+            <div v-if="showATR" class="border-t border-gray-100 pt-4 space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">ATR Type *</label>
+                <select v-model="atrForm.atr_type"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <option value="">Select…</option>
+                  <option v-for="t in ATR_TYPES" :key="t">{{ t }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Internal Remarks *</label>
+                <textarea v-model="atrForm.atr_remarks" rows="3"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+                  placeholder="Investigation findings…" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Message to Citizen</label>
+                <textarea v-model="atrForm.citizen_remarks" rows="2"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+                  placeholder="What the citizen will see (optional)" />
+              </div>
+              <label class="flex items-center gap-2 text-xs text-gray-600">
+                <input type="checkbox" v-model="atrForm.citizen_contacted" :true-value="1" :false-value="0" />
+                Citizen was contacted
+              </label>
+              <div class="flex gap-2">
+                <button @click="submitATR" :disabled="!atrForm.atr_type || !atrForm.atr_remarks || atrBusy"
+                  class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold hover:bg-brand-600 disabled:opacity-50 transition-colors">
+                  {{ atrBusy ? 'Submitting…' : 'Submit ATR' }}
+                </button>
+                <button @click="showATR = false"
+                  class="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Prajavani Hearings -->
+          <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-semibold text-gray-700">Prajavani Hearings</h3>
+              <button v-if="userInfo?.is_operator || userInfo?.is_admin"
+                @click="showPraj = !showPraj"
+                class="text-xs text-brand-500 font-medium hover:underline">
+                {{ showPraj ? 'Cancel' : '+ Add Hearing' }}
+              </button>
+            </div>
+            <div v-if="!data.prajavani_attendances.length" class="text-sm text-gray-400 mb-3">No Prajavani hearings recorded.</div>
+            <div v-else class="space-y-2 mb-3">
+              <div v-for="p in data.prajavani_attendances" :key="p.name" class="bg-purple-50 rounded-lg p-3 text-sm">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold text-purple-800">{{ p.prajavani_level }} Level — {{ fmtDate(p.prajavani_date) }}</span>
+                  <span :class="p.citizen_present ? 'text-green-600' : 'text-red-500'" class="text-xs font-medium">
+                    {{ p.citizen_present ? '✓ Present' : '✗ Absent' }}
+                  </span>
+                </div>
+                <p v-if="p.location" class="text-purple-600 text-xs mt-0.5">📍 {{ p.location }}</p>
+                <p v-if="p.gro_remarks" class="text-gray-600 text-xs mt-1">{{ p.gro_remarks }}</p>
+              </div>
+            </div>
+            <div v-if="showPraj" class="border-t border-gray-100 pt-4 space-y-3">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Date *</label>
+                  <input type="date" v-model="prajForm.prajavani_date"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Level *</label>
+                  <select v-model="prajForm.prajavani_level"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    <option>Mandal</option><option>District</option><option>State</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Venue</label>
+                <input v-model="prajForm.location" type="text"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">GRO Remarks</label>
+                <textarea v-model="prajForm.gro_remarks" rows="2"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none" />
+              </div>
+              <label class="flex items-center gap-2 text-xs text-gray-600">
+                <input type="checkbox" v-model="prajForm.citizen_present" :true-value="1" :false-value="0" />
+                Citizen was present
+              </label>
+              <div class="flex gap-2">
+                <button @click="addPraj" :disabled="!prajForm.prajavani_date || prajBusy"
+                  class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 disabled:opacity-50 transition-colors">
+                  {{ prajBusy ? 'Saving…' : 'Save Hearing' }}
+                </button>
+                <button @click="showPraj = false"
+                  class="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Appeals -->
+          <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-semibold text-gray-700">Appeals</h3>
+              <button v-if="canAppeal && (userInfo?.is_operator || userInfo?.is_admin)"
+                @click="showAppeal = !showAppeal"
+                class="text-xs text-amber-600 font-medium hover:underline">
+                {{ showAppeal ? 'Cancel' : '+ File Appeal' }}
+              </button>
+            </div>
+            <div v-if="!data.appeals.length" class="text-sm text-gray-400 mb-3">No appeals filed.</div>
+            <div v-else class="space-y-2 mb-3">
+              <div v-for="a in data.appeals" :key="a.name" class="bg-amber-50 rounded-lg p-3 text-sm">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold text-amber-800">{{ a.appeal_level }} Level Appeal</span>
+                  <span :class="badgeCls(a.status)">{{ a.status }}</span>
+                </div>
+                <p class="text-gray-600 text-xs mt-1">{{ a.reason_for_appeal }}</p>
+              </div>
+            </div>
+            <div v-if="showAppeal" class="border-t border-gray-100 pt-4 space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Appeal Level</label>
+                <select v-model="appForm.appeal_level"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <option>District</option><option>State</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Reason *</label>
+                <input v-model="appForm.reason_for_appeal" type="text"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  placeholder="Brief reason for appeal" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Detailed Explanation *</label>
+                <textarea v-model="appForm.detailed_explanation" rows="3"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+                  placeholder="Full grounds for the appeal…" />
+              </div>
+              <div class="flex gap-2">
+                <button @click="fileAppeal"
+                  :disabled="!appForm.reason_for_appeal || !appForm.detailed_explanation || appBusy"
+                  class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 disabled:opacity-50 transition-colors">
+                  {{ appBusy ? 'Filing…' : 'File Appeal' }}
+                </button>
+                <button @click="showAppeal = false"
+                  class="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </template>
+      </main>
+    </div>
+  </div>`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// New Grievance (Operator intake form)
+// ─────────────────────────────────────────────────────────────────────────────
+const DISTRICTS = [
+  'Adilabad','Bhadradri Kothagudem','Hyderabad','Jagtial','Jangaon',
+  'Jayashankar Bhupalpally','Jogulamba Gadwal','Kamareddy','Karimnagar',
+  'Khammam','Komaram Bheem','Mahabubabad','Mahabubnagar','Mancherial',
+  'Medak','Medchal–Malkajgiri','Mulugu','Nagarkurnool','Nalgonda',
+  'Narayanpet','Nirmal','Nizamabad','Peddapalli','Rajanna Sircilla',
+  'Rangareddy','Sangareddy','Siddipet','Suryapet','Vikarabad',
+  'Wanaparthy','Warangal Rural','Warangal Urban','Yadadri Bhuvanagiri',
+]
+
+const NewGrievance = {
+  components: { Sidebar, TopBar, Toast },
+  setup() {
+    const step         = ref(0)
+    const submitting   = ref(false)
+    const submitError  = ref('')
+    const submittedReg = ref('')
+    const departments  = ref([])
+    const categories   = ref([])
+
+    const form = reactive({
+      full_name:'', mobile:'', district:'', mandal:'',
+      department:'', category:'', gist:'',
+      channel:'Prajavani', registration_level:'Mandal',
+      is_group:0, is_emergency:0, is_senior:0, is_pwd:0,
+    })
+
+    onMounted(async () => { try { departments.value = await api.getDepartments() } catch {} })
+
+    async function loadCats() {
+      form.category = ''; categories.value = []
+      try { categories.value = await api.getCategories(form.department) } catch {}
+    }
+
+    const canProceed = computed(() => {
+      if (step.value === 0) return form.full_name && form.mobile.length === 10 && form.district
+      if (step.value === 1) return form.department && form.category && form.gist.length >= 10
+      return true
+    })
+
+    async function submit() {
+      submitting.value = true; submitError.value = ''
+      try {
+        const res = await api.createGrievance({ ...form })
+        if (res?.error) { submitError.value = res.error }
+        else { submittedReg.value = res.registration_no; step.value = 3 }
+      } catch { submitError.value = 'Submission failed. Please try again.' }
+      finally { submitting.value = false }
+    }
+
+    const STEPS = ['Citizen Details','Complaint Details','Review']
+    return { step, STEPS, submitting, submitError, submittedReg,
+             departments, categories, form, DISTRICTS, loadCats, canProceed, submit }
+  },
+  template: `
+  <div class="flex min-h-screen">
+    <Sidebar /><Toast />
+    <div class="flex-1 flex flex-col">
+      <TopBar title="Register New Grievance" />
+      <main class="flex-1 p-4 sm:p-6 max-w-xl">
+
+        <!-- Step indicator -->
+        <div v-if="step < 3" class="flex items-center gap-2 mb-6">
+          <template v-for="(s,i) in STEPS" :key="i">
+            <div :class="['w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all',
+              step > i  ? 'bg-green-500 border-green-500 text-white' :
+              step === i ? 'bg-brand-500 border-brand-500 text-white' :
+                           'bg-white border-gray-300 text-gray-400']">
+              <span v-if="step > i">✓</span><span v-else>{{ i+1 }}</span>
+            </div>
+            <div v-if="i < STEPS.length-1" class="h-0.5 w-10 bg-gray-200"></div>
+          </template>
+        </div>
+
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+
+          <!-- Step 0: Citizen Details -->
+          <div v-if="step === 0" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+              <input v-model="form.full_name"
+                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Mobile *</label>
+              <input v-model="form.mobile" maxlength="10"
+                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">District *</label>
+                <select v-model="form.district"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <option value="">Select…</option>
+                  <option v-for="d in DISTRICTS" :key="d">{{ d }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Mandal</label>
+                <input v-model="form.mandal" placeholder="Optional"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Channel</label>
+                <select v-model="form.channel"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <option>Prajavani</option><option>Counter</option><option>Phone</option><option>Post</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Level</label>
+                <select v-model="form.registration_level"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <option>Mandal</option><option>District</option><option>State</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-5 text-sm text-gray-600">
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" v-model="form.is_senior" :true-value="1" :false-value="0" />
+                Senior Citizen
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" v-model="form.is_pwd" :true-value="1" :false-value="0" />
+                PwD
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" v-model="form.is_emergency" :true-value="1" :false-value="0" />
+                Emergency
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" v-model="form.is_group" :true-value="1" :false-value="0" />
+                Group Grievance
+              </label>
+            </div>
+          </div>
+
+          <!-- Step 1: Complaint Details -->
+          <div v-else-if="step === 1" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Department *</label>
+              <select v-model="form.department" @change="loadCats"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="">Select…</option>
+                <option v-for="d in departments" :key="d.name" :value="d.name">{{ d.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+              <select v-model="form.category" :disabled="!form.department"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50">
+                <option value="">{{ form.department ? 'Select…' : 'Select department first' }}</option>
+                <option v-for="c in categories" :key="c.name" :value="c.name">{{ c.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Gist of Grievance *</label>
+              <textarea v-model="form.gist" rows="6"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+                placeholder="Describe the grievance in detail…" />
+              <p class="text-xs text-gray-400 mt-1">{{ form.gist.length }} characters</p>
+            </div>
+          </div>
+
+          <!-- Step 2: Review -->
+          <div v-else-if="step === 2">
+            <h3 class="font-semibold text-gray-800 mb-4">Review before saving</h3>
+            <div class="space-y-2 text-sm">
+              <div v-for="[k,v] in [
+                ['Name', form.full_name], ['Mobile', form.mobile],
+                ['District', form.district], ['Mandal', form.mandal || '—'],
+                ['Channel', form.channel], ['Level', form.registration_level],
+                ['Department', form.department], ['Category', form.category],
+              ]" :key="k" class="flex gap-3 py-2 border-b border-gray-100">
+                <span class="text-gray-400 w-28 flex-shrink-0">{{ k }}</span>
+                <span class="text-gray-800">{{ v }}</span>
+              </div>
+              <div class="flex gap-3 py-2">
+                <span class="text-gray-400 w-28 flex-shrink-0">Gist</span>
+                <span class="text-gray-700 leading-relaxed">{{ form.gist }}</span>
+              </div>
+            </div>
+            <div v-if="submitError" class="text-red-600 text-sm bg-red-50 rounded-lg p-3 mt-3">{{ submitError }}</div>
+          </div>
+
+          <!-- Step 3: Success -->
+          <div v-else class="text-center py-6">
+            <div class="text-5xl mb-4">✅</div>
+            <h3 class="text-lg font-bold text-gray-900 mb-2">Grievance Registered!</h3>
+            <p class="text-sm text-gray-500 mb-2">Registration Number:</p>
+            <div class="bg-gray-50 rounded-lg px-5 py-3 font-mono text-brand-500 font-bold text-lg mb-5 inline-block">
+              {{ submittedReg }}
+            </div>
+            <div class="flex gap-3 justify-center flex-wrap">
+              <RouterLink :to="'/grievances/' + submittedReg"
+                class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold hover:bg-brand-600 transition-colors">
+                View Grievance
+              </RouterLink>
+              <RouterLink to="/new"
+                class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+                Register Another
+              </RouterLink>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nav buttons -->
+        <div v-if="step < 3" class="flex justify-between mt-4">
+          <button v-if="step > 0" @click="step--"
+            class="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+            ← Back
+          </button>
+          <div v-else></div>
+          <button v-if="step < 2" @click="step++" :disabled="!canProceed"
+            class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold hover:bg-brand-600 disabled:opacity-50 transition-colors">
+            Next →
+          </button>
+          <button v-else @click="submit" :disabled="submitting"
+            class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold hover:bg-brand-600 disabled:opacity-50 transition-colors">
+            {{ submitting ? 'Saving…' : 'Register Grievance' }}
+          </button>
+        </div>
+      </main>
+    </div>
+  </div>`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// My Cases (Officer view)
+// ─────────────────────────────────────────────────────────────────────────────
+const MyCases = {
+  components: { Sidebar, TopBar, Toast },
+  setup() {
+    const router       = useRouter()
+    const items        = ref([])
+    const total        = ref(0)
+    const loading      = ref(false)
+    const filterStatus = ref('')
+
+    async function load() {
+      loading.value = true
+      try {
+        const res = await api.getMyCases({ status: filterStatus.value || undefined })
+        items.value = res.data || []; total.value = res.total || 0
+      } catch { showToast('Failed to load cases', 'error') }
+      finally { loading.value = false }
+    }
+
+    onMounted(load)
+    watch(filterStatus, () => load())
+
+    return { items, total, loading, filterStatus, badgeCls, fmtDate,
+             open: (n) => router.push(`/grievances/${n}`) }
+  },
+  template: `
+  <div class="flex min-h-screen">
+    <Sidebar /><Toast />
+    <div class="flex-1 flex flex-col">
+      <TopBar title="My Cases" />
+      <main class="flex-1 p-4 sm:p-6">
+        <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex gap-3">
+          <select v-model="filterStatus"
+            class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="">All Statuses</option>
+            <option>Assigned</option><option>Accepted</option><option>Under Enquiry</option><option>Interim Reply</option>
+          </select>
+          <span class="text-sm text-gray-500 self-center">{{ total }} total</span>
+        </div>
+        <div v-if="loading" class="text-center py-16 text-gray-400">Loading…</div>
+        <div v-else class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Reg No</th>
+                <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Citizen</th>
+                <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Days</th>
+                <th class="px-4 py-3 w-8"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <tr v-if="!items.length">
+                <td colspan="5" class="text-center py-12 text-gray-400">No cases assigned to you.</td>
+              </tr>
+              <tr v-for="g in items" :key="g.name"
+                class="hover:bg-gray-50 cursor-pointer transition-colors" @click="open(g.name)">
+                <td class="px-4 py-3">
+                  <p class="font-mono text-xs text-gray-500">{{ g.registration_no || g.name }}</p>
+                  <p class="text-xs text-gray-500 mt-0.5">{{ g.department }}</p>
+                </td>
+                <td class="px-4 py-3 hidden sm:table-cell text-gray-700">{{ g.citizen_name || '—' }}</td>
+                <td class="px-4 py-3"><span :class="badgeCls(g.status)">{{ g.status }}</span></td>
+                <td class="px-4 py-3">
+                  <span :class="['text-xs font-semibold',
+                    g.is_overdue ? 'text-red-600' : g.is_urgent ? 'text-amber-600' : 'text-gray-500']">
+                    {{ g.days_pending }}d{{ g.is_overdue ? ' ⚠️' : '' }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-brand-500 text-xs font-medium">→</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </div>`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Appeal Calendar
+// ─────────────────────────────────────────────────────────────────────────────
+const AppealCalendar = {
+  components: { Sidebar, TopBar, Toast },
+  setup() {
+    const events    = ref([])
+    const loading   = ref(false)
+    const showForm  = ref(false)
+    const today     = new Date()
+    const month     = ref(today.getMonth() + 1)
+    const year      = ref(today.getFullYear())
+
+    const newEvent = reactive({
+      title:'', event_date:'', event_type:'Prajavani', level:'Mandal',
+      venue:'', max_cases:50, event_time:'', district:'', notes:'',
+    })
+    const creating = ref(false)
+
+    async function load() {
+      loading.value = true
+      try { events.value = await api.getCalendarEvents({ month: month.value, year: year.value }) }
+      catch { showToast('Failed to load calendar', 'error') }
+      finally { loading.value = false }
+    }
+
+    onMounted(load)
+    watch([month, year], load)
+
+    async function createEvent() {
+      if (!newEvent.title || !newEvent.event_date) return
+      creating.value = true
+      try {
+        await api.createCalendarEvent({ ...newEvent })
+        showToast('Event created'); showForm.value = false
+        Object.assign(newEvent, { title:'', event_date:'', event_type:'Prajavani', level:'Mandal', venue:'', max_cases:50, event_time:'', district:'', notes:'' })
+        await load()
+      } catch { showToast('Failed to create event', 'error') }
+      finally { creating.value = false }
+    }
+
+    const monthName = computed(() =>
+      new Date(year.value, month.value - 1)
+        .toLocaleString('en-IN', { month: 'long', year: 'numeric' })
+    )
+
+    function prevMonth() {
+      if (month.value === 1) { month.value = 12; year.value-- } else month.value--
+    }
+    function nextMonth() {
+      if (month.value === 12) { month.value = 1; year.value++ } else month.value++
+    }
+
+    const EV_BADGE = {
+      'Prajavani':      'bg-purple-100 text-purple-700',
+      'Appeal Hearing': 'bg-amber-100 text-amber-700',
+      'Review Meeting': 'bg-blue-100 text-blue-700',
+    }
+    function evBadge(t) { return `text-xs font-semibold px-2.5 py-0.5 rounded-full ${EV_BADGE[t] || 'bg-gray-100 text-gray-700'}` }
+
+    return { events, loading, showForm, month, year, monthName, newEvent, creating,
+             createEvent, prevMonth, nextMonth, evBadge, fmtDate, userInfo }
+  },
+  template: `
+  <div class="flex min-h-screen">
+    <Sidebar /><Toast />
+    <div class="flex-1 flex flex-col">
+      <TopBar title="Appeal Calendar" />
+      <main class="flex-1 p-4 sm:p-6">
+
+        <!-- Month navigation -->
+        <div class="flex items-center justify-between mb-5">
+          <div class="flex items-center gap-3">
+            <button @click="prevMonth"
+              class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">←</button>
+            <h2 class="text-base font-semibold text-gray-900 w-44 text-center">{{ monthName }}</h2>
+            <button @click="nextMonth"
+              class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">→</button>
+          </div>
+          <button v-if="userInfo?.is_operator || userInfo?.is_admin"
+            @click="showForm = !showForm"
+            class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold hover:bg-brand-600 transition-colors">
+            {{ showForm ? '✕ Cancel' : '+ New Event' }}
+          </button>
+        </div>
+
+        <!-- Create event form -->
+        <div v-if="showForm" class="bg-white rounded-xl border border-gray-200 p-5 mb-5">
+          <h3 class="font-semibold text-gray-800 mb-4">New Calendar Event</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Title *</label>
+              <input v-model="newEvent.title"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="Event title" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Date *</label>
+              <input type="date" v-model="newEvent.event_date"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Event Type</label>
+              <select v-model="newEvent.event_type"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option>Prajavani</option><option>Appeal Hearing</option><option>Review Meeting</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Level</label>
+              <select v-model="newEvent.level"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option>Mandal</option><option>District</option><option>State</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Venue</label>
+              <input v-model="newEvent.venue"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Max Cases</label>
+              <input type="number" v-model="newEvent.max_cases" min="1"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Time</label>
+              <input type="time" v-model="newEvent.event_time"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">District</label>
+              <input v-model="newEvent.district"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="Optional" />
+            </div>
+          </div>
+          <div class="mt-4 flex gap-2">
+            <button @click="createEvent" :disabled="!newEvent.title || !newEvent.event_date || creating"
+              class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold hover:bg-brand-600 disabled:opacity-50 transition-colors">
+              {{ creating ? 'Creating…' : 'Create Event' }}
+            </button>
+            <button @click="showForm = false"
+              class="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+
+        <div v-if="loading" class="text-center py-16 text-gray-400">Loading…</div>
+        <div v-else-if="!events.length" class="text-center py-16 text-gray-400">
+          <div class="text-4xl mb-3">📅</div>
+          <p>No events scheduled for {{ monthName }}.</p>
+        </div>
+        <div v-else class="space-y-3">
+          <div v-for="ev in events" :key="ev.name" class="bg-white rounded-xl border border-gray-200 p-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span :class="evBadge(ev.event_type)">{{ ev.event_type }}</span>
+                  <span class="text-xs text-gray-400">
+                    {{ fmtDate(ev.event_date) }}{{ ev.event_time ? ' · ' + ev.event_time : '' }}
+                  </span>
+                </div>
+                <h4 class="font-semibold text-gray-900">{{ ev.title }}</h4>
+                <p v-if="ev.venue" class="text-sm text-gray-500 mt-0.5">📍 {{ ev.venue }}</p>
+                <p class="text-xs text-gray-400 mt-1">
+                  {{ ev.level }} Level · {{ ev.grievance_count }}/{{ ev.max_cases }} cases
+                </p>
+              </div>
+              <span :class="[
+                'text-xs font-semibold px-2.5 py-1 rounded-full',
+                ev.status === 'Scheduled'  ? 'bg-blue-100 text-blue-700' :
+                ev.status === 'Completed'  ? 'bg-green-100 text-green-700' :
+                                              'bg-gray-100 text-gray-600'
+              ]">{{ ev.status }}</span>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Router & App
+// ─────────────────────────────────────────────────────────────────────────────
+const router = createRouter({
+  history: createWebHashHistory(),
+  routes: [
+    { path: '/',                component: Dashboard },
+    { path: '/grievances',      component: GrievanceList },
+    { path: '/grievances/:id',  component: GrievanceDetail },
+    { path: '/new',             component: NewGrievance },
+    { path: '/my-cases',        component: MyCases },
+    { path: '/calendar',        component: AppealCalendar },
+  ],
+  scrollBehavior: () => ({ top: 0 }),
+})
+
+const App = {
+  components: { Toast },
+  setup() {
+    onMounted(async () => {
+      try { userInfo.value = await api.getUserInfo() } catch {}
+    })
+    return {}
+  },
+  template: `<RouterView /><Toast />`,
+}
+
+createApp(App)
+  .use(router)
+  .component('RouterView', RouterView)
+  .component('RouterLink', RouterLink)
+  .mount('#app')
+</script>
+</body>
+</html>{% endraw %}

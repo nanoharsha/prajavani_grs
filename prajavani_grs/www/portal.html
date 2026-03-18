@@ -42,10 +42,24 @@ async function apicall(method, params = {}) {
   if (data.exc) throw new Error(data.exc)
   return data.message
 }
+async function apipost(method, params = {}) {
+  const url = `${BASE}.${method}`
+  const body = new URLSearchParams(params)
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  })
+  const data = await res.json()
+  if (data.exc) throw new Error(data.exc)
+  return data.message
+}
 const api = {
-  track:         reg  => apicall('track_grievance', { registration_no: reg }),
-  departments:   ()   => apicall('get_departments'),
-  categories:    dep  => apicall('get_categories', { department: dep }),
+  track:          reg     => apicall('track_grievance', { registration_no: reg }),
+  departments:    ()      => apicall('get_departments'),
+  categories:     dep     => apicall('get_categories', { department: dep }),
+  subCategories:  cat     => apicall('get_sub_categories', { category: cat }),
+  submitGrievance: payload => apipost('submit_grievance', payload),
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -355,21 +369,27 @@ const Register = {
   setup() {
     const step       = ref(0)
     const steps      = ['Personal Details', 'Complaint Details', 'Review & Submit']
-    const departments = ref([])
-    const categories  = ref([])
-    const submitting  = ref(false)
-    const submitError = ref('')
+    const departments  = ref([])
+    const categories   = ref([])
+    const subCats      = ref([])
+    const submitting   = ref(false)
+    const submitError  = ref('')
     const submittedReg = ref('')
-    const form = reactive({ name:'', mobile:'', district:'', department:'', category:'', gist:'' })
+    const form = reactive({ name:'', mobile:'', district:'', department:'', category:'', sub_category:'', gist:'' })
 
     onMounted(async () => {
       try { departments.value = await api.departments() } catch {}
     })
 
     async function loadCats() {
-      form.category = ''
-      categories.value = []
+      form.category = ''; form.sub_category = ''
+      categories.value = []; subCats.value = []
       try { categories.value = await api.categories(form.department) } catch {}
+    }
+
+    async function loadSubCats() {
+      form.sub_category = ''; subCats.value = []
+      try { subCats.value = await api.subCategories(form.category) } catch {}
     }
 
     const canProceed = computed(() => {
@@ -381,15 +401,26 @@ const Register = {
     async function submit() {
       submitting.value = true; submitError.value = ''
       try {
-        await new Promise(r => setTimeout(r, 1000))
-        submittedReg.value = 'GRS/' + new Date().getFullYear() + '/DEMO/00001'
-        step.value = 3
-      } catch { submitError.value = 'Submission failed. Please try again or call the helpline.' }
+        const payload = {
+          full_name:    form.name,
+          mobile:       form.mobile,
+          district:     form.district,
+          department:   form.department,
+          category:     form.category,
+          gist:         form.gist,
+        }
+        if (form.sub_category) payload.sub_category = form.sub_category
+        const res = await api.submitGrievance(payload)
+        if (res?.error) { submitError.value = res.error }
+        else { submittedReg.value = res.registration_no; step.value = 3 }
+      } catch (e) {
+        submitError.value = 'Submission failed. Please try again or call the helpline.'
+      }
       finally { submitting.value = false }
     }
 
-    return { step, steps, departments, categories, submitting, submitError, submittedReg,
-             form, loadCats, canProceed, submit, DISTRICTS }
+    return { step, steps, departments, categories, subCats, submitting, submitError, submittedReg,
+             form, loadCats, loadSubCats, canProceed, submit, DISTRICTS }
   },
   template: `
   <div>
@@ -447,9 +478,16 @@ const Register = {
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Category *</label>
-            <select v-model="form.category" :disabled="!form.department" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50">
+            <select v-model="form.category" @change="loadSubCats" :disabled="!form.department" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50">
               <option value="">{{ form.department ? 'Select category' : 'Select a department first' }}</option>
               <option v-for="c in categories" :key="c.name" :value="c.name">{{ c.name }}</option>
+            </select>
+          </div>
+          <div v-if="subCats.length">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Sub-Category</label>
+            <select v-model="form.sub_category" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">Select sub-category (optional)</option>
+              <option v-for="s in subCats" :key="s.name" :value="s.name">{{ s.name }}</option>
             </select>
           </div>
           <div>
