@@ -4,33 +4,140 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "fields": [
-  {"fieldname": "full_name",        "fieldtype": "Data",         "label": "Full Name",                "reqd": 1, "in_list_view": 1, "in_standard_filter": 1},
-  {"fieldname": "gender",           "fieldtype": "Select",       "label": "Gender",                   "reqd": 1, "options": "\nMale\nFemale\nTransgender", "in_list_view": 1},
-  {"fieldname": "mobile_number",    "fieldtype": "Data",         "label": "Mobile Number",            "reqd": 1, "options": "Phone", "in_list_view": 1, "in_standard_filter": 1},
-  {"fieldname": "col1",             "fieldtype": "Column Break"},
-  {"fieldname": "aadhaar_last4",    "fieldtype": "Data",         "label": "Aadhaar Last 4 Digits",    "reqd": 1, "description": "Store last 4 digits only."},
-  {"fieldname": "aadhaar_consent",  "fieldtype": "Check",        "label": "Citizen Consents to Aadhaar Disclosure", "default": "1"},
-  {"fieldname": "ration_card_no",   "fieldtype": "Data",         "label": "Ration Card Number"},
-  {"fieldname": "sec_addr",         "fieldtype": "Section Break","label": "Address"},
-  {"fieldname": "district",         "fieldtype": "Link",         "label": "District",                 "reqd": 1, "options": "GRS District", "in_list_view": 1, "in_standard_filter": 1},
-  {"fieldname": "mandal_ward",      "fieldtype": "Link",         "label": "Mandal / Ward",            "reqd": 1, "options": "GRS Mandal"},
-  {"fieldname": "address",          "fieldtype": "Small Text",   "label": "Full Address",             "reqd": 1},
-  {"fieldname": "col2",             "fieldtype": "Column Break"},
-  {"fieldname": "is_senior_citizen","fieldtype": "Check",        "label": "Senior Citizen (60+)"},
-  {"fieldname": "is_pwd",           "fieldtype": "Check",        "label": "Person with Disability (PwD)"},
-  {"fieldname": "registrant_type",  "fieldtype": "Select",       "label": "Registrant Type",          "options": "Citizen\nDepartment Staff", "default": "Citizen"}
+  {
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "label": "Full Name",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "gender",
+   "fieldtype": "Select",
+   "label": "Gender",
+   "reqd": 1,
+   "options": "\nMale\nFemale\nTransgender",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "mobile_number",
+   "fieldtype": "Data",
+   "label": "Mobile Number",
+   "reqd": 1,
+   "options": "Phone",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "col1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "aadhaar_last4",
+   "fieldtype": "Data",
+   "label": "Aadhaar Last 4 Digits",
+   "reqd": 1,
+   "description": "Store last 4 digits only."
+  },
+  {
+   "fieldname": "aadhaar_consent",
+   "fieldtype": "Check",
+   "label": "Citizen Consents to Aadhaar Disclosure",
+   "default": "1"
+  },
+  {
+   "fieldname": "ration_card_no",
+   "fieldtype": "Data",
+   "label": "Ration Card Number"
+  },
+  {
+   "fieldname": "sec_addr",
+   "fieldtype": "Section Break",
+   "label": "Address"
+  },
+  {
+   "fieldname": "district",
+   "fieldtype": "Link",
+   "label": "District",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "options": "GRS District"
+  },
+  {
+   "fieldname": "mandal_ward",
+   "fieldtype": "Link",
+   "label": "Mandal / Ward",
+   "reqd": 0,
+   "options": "GRS Mandal"
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "label": "Full Address",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "is_senior_citizen",
+   "fieldtype": "Check",
+   "label": "Senior Citizen (60+)"
+  },
+  {
+   "fieldname": "is_pwd",
+   "fieldtype": "Check",
+   "label": "Person with Disability (PwD)"
+  },
+  {
+   "fieldname": "registrant_type",
+   "fieldtype": "Select",
+   "label": "Registrant Type",
+   "options": "Citizen\nDepartment Staff",
+   "default": "Citizen"
+  }
  ],
  "icon": "fa fa-user",
- "links": [{"link_doctype": "Grievance", "link_fieldname": "citizen"}],
+ "links": [
+  {
+   "link_doctype": "Grievance",
+   "link_fieldname": "citizen"
+  }
+ ],
  "modified": "2026-03-01 00:00:00",
  "modified_by": "Administrator",
  "module": "GRS",
  "name": "Citizen",
  "owner": "Administrator",
  "permissions": [
-  {"create": 1, "delete": 0, "print": 1, "read": 1, "report": 1, "write": 1, "role": "GRS Operator"},
-  {"read": 1, "role": "GRS Officer"},
-  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "share": 1, "write": 1, "role": "GRS Admin"}
+  {
+   "create": 1,
+   "delete": 0,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "write": 1,
+   "role": "GRS Operator"
+  },
+  {
+   "read": 1,
+   "role": "GRS Officer"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "share": 1,
+   "write": 1,
+   "role": "GRS Admin"
+  }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",

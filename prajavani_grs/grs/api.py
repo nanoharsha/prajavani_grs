@@ -316,6 +316,29 @@ def track_grievance(registration_no):
 
 
 @frappe.whitelist(allow_guest=True)
+def get_districts():
+    return frappe.db.get_all(
+        "GRS District",
+        filters={"active": 1},
+        fields=["name as district_name"],
+        order_by="district_name asc",
+    )
+
+
+@frappe.whitelist(allow_guest=True)
+def get_mandals(district=None):
+    filters = {"active": 1}
+    if district:
+        filters["district"] = district
+    return frappe.db.get_all(
+        "GRS Mandal",
+        filters=filters,
+        fields=["name as mandal_name", "district"],
+        order_by="mandal_name asc",
+    )
+
+
+@frappe.whitelist(allow_guest=True)
 def get_departments():
     return frappe.db.get_all("GRS Department", fields=["name"], order_by="name asc")
 

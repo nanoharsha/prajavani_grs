@@ -68,7 +68,7 @@ def _build_grievance_filters(officer, level=None, district=None, mandal=None,
 
 # ── User Info ──────────────────────────────────────────────────────────────────
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_user_info():
     """Return current session user info + roles + officer profile."""
     user = frappe.session.user
@@ -172,11 +172,22 @@ def get_grievance_detail(grievance_id):
         order_by="filing_date asc",
     )
 
+    enquiries = frappe.get_all(
+        "GRS Enquiry",
+        filters={"grievance": grievance_id},
+        fields=["name", "enquiry_date", "enquiry_type", "recorded_by_name",
+                "recorded_on_behalf_of", "persons_met", "location_visited",
+                "citizen_present", "documents_received", "findings",
+                "recommendation", "status"],
+        order_by="enquiry_date asc",
+    )
+
     return {
         "grievance": g.as_dict(),
         "citizen": citizen,
         "atrs": atrs,
         "prajavani_attendances": attendances,
+        "enquiries": enquiries,
         "appeals": appeals,
     }
 
@@ -227,7 +238,7 @@ def create_grievance(full_name, mobile, district, department, category, gist,
             "mobile_number": mobile,
             "gender": gender or "Male",
             "district": district,
-            "mandal_ward": mandal or "",
+            "mandal_ward": mandal or None,
             "aadhaar_last4": "0000",
             "address": f"{mandal or district}",
             "is_senior_citizen": int(is_senior),
@@ -326,6 +337,61 @@ def add_prajavani_attendance(grievance_id, prajavani_date, prajavani_level,
     pa.insert(ignore_permissions=True)
     frappe.db.commit()
     return {"success": True, "name": pa.name}
+
+
+# ── Enquiry Remarks ────────────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def save_enquiry_remark(grievance_id, enquiry_date, enquiry_type, findings,
+                        persons_met=None, location_visited=None,
+                        citizen_present=0, documents_received=None,
+                        recommendation=None, status="Draft",
+                        enquiry_id=None):
+    """Create or update an enquiry remark. Operators and officers can both use this."""
+    _require_login()
+    if not (_is_operator() or _is_officer()):
+        frappe.throw(_("Insufficient permissions."), frappe.PermissionError)
+
+    if not frappe.db.exists("Grievance", grievance_id):
+        frappe.throw(_("Grievance not found."))
+
+    officer = _get_officer_record()
+    user = frappe.session.user
+    full_name = frappe.db.get_value("User", user, "full_name") or user
+
+    if enquiry_id and frappe.db.exists("GRS Enquiry", enquiry_id):
+        enq = frappe.get_doc("GRS Enquiry", enquiry_id)
+        enq.enquiry_date = enquiry_date
+        enq.enquiry_type = enquiry_type
+        enq.findings = findings
+        enq.persons_met = persons_met or ""
+        enq.location_visited = location_visited or ""
+        enq.citizen_present = int(citizen_present)
+        enq.documents_received = documents_received or ""
+        enq.recommendation = recommendation or ""
+        enq.status = status
+        enq.save(ignore_permissions=True)
+    else:
+        enq = frappe.get_doc({
+            "doctype": "GRS Enquiry",
+            "grievance": grievance_id,
+            "enquiry_date": enquiry_date,
+            "enquiry_type": enquiry_type,
+            "findings": findings,
+            "persons_met": persons_met or "",
+            "location_visited": location_visited or "",
+            "citizen_present": int(citizen_present),
+            "documents_received": documents_received or "",
+            "recommendation": recommendation or "",
+            "status": status,
+            "recorded_by": officer.name if officer else None,
+            "recorded_by_name": officer.full_name if officer else full_name,
+            "recorded_on_behalf_of": full_name if not officer else "",
+        })
+        enq.insert(ignore_permissions=True)
+
+    frappe.db.commit()
+    return {"success": True, "name": enq.name, "status": enq.status}
 
 
 @frappe.whitelist()
@@ -612,8 +678,78 @@ def submit_atr(grievance_id, atr_type, atr_remarks,
         "reason_for_delay": reason_for_delay or "",
     })
     atr.insert(ignore_permissions=True)
+
+    # Auto-submit any draft enquiry entries for this grievance
+    draft_enquiries = frappe.get_all(
+        "GRS Enquiry",
+        filters={"grievance": grievance_id, "status": "Draft"},
+        pluck="name",
+    )
+    for eq_name in draft_enquiries:
+        frappe.db.set_value("GRS Enquiry", eq_name, "status", "Submitted")
+
+    # Update grievance status based on ATR type
+    atr_status_map = {
+        "Final ATR": "Closed",
+        "Closure": "Closed",
+        "Sub-Judice": "Sub-Judice",
+        "Interim Reply": "Interim Reply",
+        "Policy Decision Awaited": "Policy Awaited",
+        "ATR for Further Action": "Under Enquiry",
+    }
+    new_status = atr_status_map.get(atr_type)
+    if new_status:
+        frappe.db.set_value("Grievance", grievance_id, "status", new_status)
+
     frappe.db.commit()
     return {"success": True, "atr_id": atr.name}
+
+
+# ── ATR Print Data ─────────────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_atr_print_data(grievance_id):
+    """Return full ATR + enquiry trail for printable ATR report."""
+    _require_login()
+    if not (_is_operator() or _is_officer()):
+        frappe.throw(_("Insufficient permissions."), frappe.PermissionError)
+
+    if not frappe.db.exists("Grievance", grievance_id):
+        frappe.throw(_("Grievance not found."))
+
+    g = frappe.get_doc("Grievance", grievance_id)
+    citizen = frappe.db.get_value(
+        "Citizen", g.citizen,
+        ["full_name", "mobile_number", "district", "mandal_ward", "gender"],
+        as_dict=True,
+    ) if g.citizen else {}
+
+    atrs = frappe.get_all(
+        "ATR Action",
+        filters={"grievance": grievance_id},
+        fields=["name", "atr_type", "submission_date", "filed_by_name",
+                "atr_remarks", "citizen_remarks", "citizen_contacted",
+                "mode_of_contact", "enquiry_period_from", "enquiry_period_to",
+                "forward_to_level", "expected_resolution_days"],
+        order_by="submission_date asc",
+    )
+
+    enquiries = frappe.get_all(
+        "GRS Enquiry",
+        filters={"grievance": grievance_id},
+        fields=["name", "enquiry_date", "enquiry_type", "recorded_by_name",
+                "recorded_on_behalf_of", "persons_met", "location_visited",
+                "citizen_present", "documents_received", "findings",
+                "recommendation", "status"],
+        order_by="enquiry_date asc",
+    )
+
+    return {
+        "grievance": g.as_dict(),
+        "citizen": citizen,
+        "atrs": atrs,
+        "enquiries": enquiries,
+    }
 
 
 # ── Dashboard Statistics ───────────────────────────────────────────────────────
