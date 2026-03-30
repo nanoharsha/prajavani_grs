@@ -1,0 +1,195 @@
+{
+ "actions": [],
+ "autoname": "GRS-ENQ-.YYYY.-.#####",
+ "creation": "2024-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "grievance",
+  "grievance_reg_no",
+  "enquiry_date",
+  "enquiry_type",
+  "col1",
+  "recorded_by",
+  "recorded_by_name",
+  "recorded_on_behalf_of",
+  "sec_details",
+  "persons_met",
+  "location_visited",
+  "col2",
+  "citizen_present",
+  "documents_received",
+  "sec_findings",
+  "findings",
+  "sec_recommendation",
+  "recommendation",
+  "sec_status",
+  "status"
+ ],
+ "fields": [
+  {
+   "fieldname": "grievance",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Grievance",
+   "options": "Grievance",
+   "reqd": 1
+  },
+  {
+   "fieldname": "grievance_reg_no",
+   "fieldtype": "Data",
+   "fetch_from": "grievance.registration_no",
+   "in_list_view": 1,
+   "label": "Registration No.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "enquiry_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Enquiry Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "enquiry_type",
+   "fieldtype": "Select",
+   "label": "Type of Enquiry",
+   "options": "Field Visit\nHearing at Office\nPrajavani Hearing\nPhone Enquiry\nDocument Verification\nOther",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "recorded_by",
+   "fieldtype": "Link",
+   "label": "Recorded By (Officer)",
+   "options": "GRO Officer"
+  },
+  {
+   "fieldname": "recorded_by_name",
+   "fieldtype": "Data",
+   "label": "Officer Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "recorded_on_behalf_of",
+   "fieldtype": "Data",
+   "label": "Recorded by Operator (on behalf of)"
+  },
+  {
+   "fieldname": "sec_details",
+   "fieldtype": "Section Break",
+   "label": "Enquiry Details"
+  },
+  {
+   "fieldname": "persons_met",
+   "fieldtype": "Small Text",
+   "label": "Persons Met / Contacted"
+  },
+  {
+   "fieldname": "location_visited",
+   "fieldtype": "Data",
+   "label": "Location / Site Visited"
+  },
+  {
+   "fieldname": "col2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "citizen_present",
+   "fieldtype": "Check",
+   "label": "Citizen Was Present"
+  },
+  {
+   "fieldname": "documents_received",
+   "fieldtype": "Small Text",
+   "label": "Documents Received / Reviewed"
+  },
+  {
+   "fieldname": "sec_findings",
+   "fieldtype": "Section Break",
+   "label": "Findings"
+  },
+  {
+   "fieldname": "findings",
+   "fieldtype": "Long Text",
+   "label": "Enquiry Findings",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sec_recommendation",
+   "fieldtype": "Section Break",
+   "label": "Recommendation"
+  },
+  {
+   "fieldname": "recommendation",
+   "fieldtype": "Long Text",
+   "label": "Recommendation / Next Step"
+  },
+  {
+   "fieldname": "sec_status",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Draft\nSubmitted",
+   "default": "Draft"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2024-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "GRS",
+ "name": "GRS Enquiry",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "GRS Admin",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 0,
+   "role": "GRS Operator",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "GRS Officer",
+   "share": 0,
+   "write": 1
+  }
+ ],
+ "sort_field": "enquiry_date",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

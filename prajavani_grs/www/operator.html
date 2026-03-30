@@ -76,6 +76,7 @@ const api = {
   assignOfficer:           (gid, oid)  => apipost(BASE_PRIV, 'assign_officer_to_grievance', { grievance_id: gid, officer_id: oid }),
   createGrievance:         (p)         => apipost(BASE_PRIV, 'create_grievance', p),
   addPrajavaniAttendance:  (p)         => apipost(BASE_PRIV, 'add_prajavani_attendance', p),
+  saveEnquiry:             (p)         => apipost(BASE_PRIV, 'save_enquiry_remark', p),
   fileAppealOperator:      (p)         => apipost(BASE_PRIV, 'file_appeal_operator', p),
   getCalendarEvents:       (p)         => apicall(BASE_PRIV, 'get_calendar_events', p),
   createCalendarEvent:     (p)         => apipost(BASE_PRIV, 'create_calendar_event', p),
@@ -394,6 +395,7 @@ const GrievanceDetail = {
     const showATR    = ref(false)
     const showPraj   = ref(false)
     const showAppeal = ref(false)
+    const showEnquiry = ref(false)
 
     // ATR form
     const ATR_TYPES = ['Interim Reply','ATR for Further Action','Final ATR','Sub-Judice','Policy Decision Awaited','Closure']
@@ -403,6 +405,16 @@ const GrievanceDetail = {
     // Prajavani form
     const prajForm = reactive({ prajavani_date:'', prajavani_level:'Mandal', location:'', citizen_present:1, gro_remarks:'' })
     const prajBusy = ref(false)
+
+    // Enquiry form
+    const ENQUIRY_TYPES = ['Field Visit','Hearing at Office','Prajavani Hearing','Phone Enquiry','Document Verification','Other']
+    const enqForm = reactive({
+      enquiry_date:'', enquiry_type:'Field Visit', findings:'',
+      persons_met:'', location_visited:'', citizen_present:0,
+      documents_received:'', recommendation:'', status:'Draft',
+    })
+    const enqBusy = ref(false)
+    const editingEnquiryId = ref(null)
 
     // Appeal form
     const appForm = reactive({ reason_for_appeal:'', detailed_explanation:'', appeal_level:'District' })
@@ -460,6 +472,38 @@ const GrievanceDetail = {
       finally { prajBusy.value = false }
     }
 
+    async function saveEnquiry() {
+      if (!enqForm.enquiry_date || !enqForm.findings) return
+      enqBusy.value = true
+      try {
+        await api.saveEnquiry({
+          grievance_id: route.params.id,
+          enquiry_id: editingEnquiryId.value || undefined,
+          ...enqForm,
+        })
+        showToast(enqForm.status === 'Submitted' ? 'Enquiry submitted' : 'Enquiry saved as draft')
+        showEnquiry.value = false
+        editingEnquiryId.value = null
+        Object.assign(enqForm, { enquiry_date:'', enquiry_type:'Field Visit', findings:'',
+          persons_met:'', location_visited:'', citizen_present:0,
+          documents_received:'', recommendation:'', status:'Draft' })
+        await load()
+      } catch { showToast('Failed to save enquiry', 'error') }
+      finally { enqBusy.value = false }
+    }
+
+    function editEnquiry(eq) {
+      Object.assign(enqForm, {
+        enquiry_date: eq.enquiry_date, enquiry_type: eq.enquiry_type,
+        findings: eq.findings, persons_met: eq.persons_met || '',
+        location_visited: eq.location_visited || '', citizen_present: eq.citizen_present || 0,
+        documents_received: eq.documents_received || '', recommendation: eq.recommendation || '',
+        status: eq.status,
+      })
+      editingEnquiryId.value = eq.name
+      showEnquiry.value = true
+    }
+
     async function fileAppeal() {
       if (!appForm.reason_for_appeal || !appForm.detailed_explanation) return
       appBusy.value = true
@@ -483,6 +527,7 @@ const GrievanceDetail = {
       data, loading, officers, selOfficer, assigning, loadOfficers, assign,
       showATR, ATR_TYPES, atrForm, atrBusy, submitATR,
       showPraj, prajForm, prajBusy, addPraj,
+      showEnquiry, ENQUIRY_TYPES, enqForm, enqBusy, saveEnquiry, editEnquiry, editingEnquiryId,
       showAppeal, appForm, appBusy, fileAppeal,
       canAppeal, badgeCls, fmtDate, userInfo,
     }
@@ -576,6 +621,16 @@ const GrievanceDetail = {
               </div>
             </div>
             <div v-if="showATR" class="border-t border-gray-100 pt-4 space-y-3">
+              <!-- Enquiry trail reference -->
+              <div v-if="data.enquiries?.length" class="bg-teal-50 border border-teal-200 rounded-lg p-3">
+                <p class="text-xs font-semibold text-teal-700 mb-2">Enquiry Trail ({{ data.enquiries.length }} entr{{ data.enquiries.length === 1 ? 'y' : 'ies' }})</p>
+                <div v-for="eq in data.enquiries" :key="eq.name" class="text-xs text-gray-700 mb-2 border-b border-teal-100 pb-2 last:border-0 last:mb-0 last:pb-0">
+                  <span class="font-medium text-teal-800">{{ eq.enquiry_type }}</span>
+                  <span class="text-gray-400 ml-1">{{ fmtDate(eq.enquiry_date) }}</span>
+                  <p class="mt-0.5 whitespace-pre-line leading-relaxed">{{ eq.findings }}</p>
+                  <p v-if="eq.recommendation" class="text-teal-600 italic mt-0.5">→ {{ eq.recommendation }}</p>
+                </div>
+              </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">ATR Type *</label>
                 <select v-model="atrForm.atr_type"
@@ -671,6 +726,119 @@ const GrievanceDetail = {
                   {{ prajBusy ? 'Saving…' : 'Save Hearing' }}
                 </button>
                 <button @click="showPraj = false"
+                  class="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Enquiry Remarks -->
+          <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-700">Enquiry Remarks</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Officer's investigation notes — becomes part of the final ATR</p>
+              </div>
+              <button v-if="data.grievance.status !== 'Closed'"
+                @click="showEnquiry = !showEnquiry; editingEnquiryId = null; Object.assign(enqForm, { enquiry_date:'', enquiry_type:'Field Visit', findings:'', persons_met:'', location_visited:'', citizen_present:0, documents_received:'', recommendation:'', status:'Draft' })"
+                class="text-xs text-teal-600 font-medium hover:underline whitespace-nowrap">
+                {{ showEnquiry && !editingEnquiryId ? 'Cancel' : '+ Add Entry' }}
+              </button>
+            </div>
+
+            <!-- Existing enquiry entries -->
+            <div v-if="!data.enquiries?.length" class="text-sm text-gray-400 mb-3">No enquiry entries yet.</div>
+            <div v-else class="space-y-3 mb-3">
+              <div v-for="eq in data.enquiries" :key="eq.name"
+                   :class="['rounded-lg p-3 text-sm border', eq.status === 'Submitted' ? 'bg-teal-50 border-teal-200' : 'bg-yellow-50 border-yellow-200']">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <span class="font-semibold text-gray-800">{{ eq.enquiry_type }}</span>
+                    <span class="text-xs text-gray-500 ml-2">{{ fmtDate(eq.enquiry_date) }}</span>
+                    <span :class="eq.status === 'Submitted' ? 'bg-teal-100 text-teal-700' : 'bg-yellow-100 text-yellow-700'"
+                          class="text-xs font-semibold px-1.5 py-0.5 rounded-full ml-2">{{ eq.status }}</span>
+                  </div>
+                  <button v-if="eq.status === 'Draft' && data.grievance.status !== 'Closed'"
+                    @click="editEnquiry(eq)"
+                    class="text-xs text-teal-600 underline flex-shrink-0">Edit</button>
+                </div>
+                <p v-if="eq.location_visited || eq.persons_met" class="text-xs text-gray-500 mt-1">
+                  <span v-if="eq.location_visited">📍 {{ eq.location_visited }}</span>
+                  <span v-if="eq.persons_met" class="ml-2">👤 {{ eq.persons_met }}</span>
+                </p>
+                <p class="text-gray-700 text-xs mt-1 leading-relaxed whitespace-pre-line">{{ eq.findings }}</p>
+                <p v-if="eq.recommendation" class="text-teal-700 text-xs mt-1 italic">
+                  Recommendation: {{ eq.recommendation }}
+                </p>
+                <p class="text-xs text-gray-400 mt-1">
+                  — {{ eq.recorded_by_name || eq.recorded_on_behalf_of }}
+                  <span v-if="eq.recorded_on_behalf_of"> (via operator)</span>
+                </p>
+              </div>
+            </div>
+
+            <!-- Add / Edit form -->
+            <div v-if="showEnquiry" class="border-t border-gray-100 pt-4 space-y-3">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Date *</label>
+                  <input type="date" v-model="enqForm.enquiry_date"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Type *</label>
+                  <select v-model="enqForm.enquiry_type"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    <option v-for="t in ENQUIRY_TYPES" :key="t">{{ t }}</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Location / Site</label>
+                  <input v-model="enqForm.location_visited" type="text"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Persons Met</label>
+                  <input v-model="enqForm.persons_met" type="text"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Findings *</label>
+                <textarea v-model="enqForm.findings" rows="4"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                  placeholder="What was observed / found during enquiry…" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Recommendation / Next Step</label>
+                <textarea v-model="enqForm.recommendation" rows="2"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                  placeholder="What action should be taken next…" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Documents Received / Reviewed</label>
+                <input v-model="enqForm.documents_received" type="text"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+              </div>
+              <label class="flex items-center gap-2 text-xs text-gray-600">
+                <input type="checkbox" v-model="enqForm.citizen_present" :true-value="1" :false-value="0" />
+                Citizen was present
+              </label>
+              <div class="flex gap-2 flex-wrap">
+                <button @click="enqForm.status = 'Draft'; saveEnquiry()"
+                  :disabled="!enqForm.enquiry_date || !enqForm.findings || enqBusy"
+                  class="px-4 py-2 border border-teal-500 text-teal-600 rounded-lg text-sm font-semibold hover:bg-teal-50 disabled:opacity-50 transition-colors">
+                  {{ enqBusy ? 'Saving…' : 'Save Draft' }}
+                </button>
+                <button @click="enqForm.status = 'Submitted'; saveEnquiry()"
+                  :disabled="!enqForm.enquiry_date || !enqForm.findings || enqBusy"
+                  class="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 transition-colors">
+                  {{ enqBusy ? 'Submitting…' : 'Submit Entry' }}
+                </button>
+                <button @click="showEnquiry = false; editingEnquiryId = null"
                   class="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors">
                   Cancel
                 </button>
