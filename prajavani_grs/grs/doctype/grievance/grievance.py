@@ -130,7 +130,34 @@ class Grievance(Document):
                 "details": details
             })
 
-        # 4. Appeals
+        # 4. Enquiry entries
+        enquiries = frappe.get_all(
+            "GRS Enquiry",
+            filters={"grievance": self.name, "status": "Submitted"},
+            fields=["enquiry_date", "enquiry_type", "recorded_by_name",
+                    "recorded_on_behalf_of", "persons_met", "location_visited",
+                    "findings", "recommendation"],
+            order_by="enquiry_date asc",
+        )
+        for eq in enquiries:
+            details = {}
+            if eq.location_visited:
+                details["Location"] = eq.location_visited
+            if eq.persons_met:
+                details["Persons Met"] = eq.persons_met
+            if eq.findings:
+                details["Findings"] = eq.findings
+            if eq.recommendation:
+                details["Recommendation"] = eq.recommendation
+            details["Recorded By"] = eq.recorded_by_name or eq.recorded_on_behalf_of or ""
+            events.append({
+                "date": str(eq.enquiry_date) if eq.enquiry_date else "",
+                "type": "enquiry",
+                "title": f"Enquiry — {eq.enquiry_type}",
+                "details": details,
+            })
+
+        # 5. Appeals
         appeals = frappe.get_all(
             "Appeal",
             filters={"linked_grievance": self.name},

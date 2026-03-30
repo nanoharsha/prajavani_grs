@@ -169,7 +169,38 @@ def _build_timeline(grievance):
             "details": details,
         })
 
-    # 5. Appeals
+    # 5. Enquiry entries (submitted only — not draft)
+    try:
+        enquiries = frappe.db.get_all(
+            "GRS Enquiry",
+            filters={"grievance": grievance.name, "status": "Submitted"},
+            fields=["enquiry_date", "enquiry_type", "recorded_by_name",
+                    "recorded_on_behalf_of", "persons_met", "location_visited",
+                    "citizen_present", "findings", "recommendation"],
+            order_by="enquiry_date asc",
+        )
+    except Exception:
+        enquiries = []
+    for eq in enquiries:
+        details = {"Type": eq.enquiry_type}
+        if eq.location_visited:
+            details["Location"] = eq.location_visited
+        if eq.persons_met:
+            details["Persons Met"] = eq.persons_met
+        if eq.findings:
+            details["Findings"] = eq.findings
+        if eq.recommendation:
+            details["Recommendation"] = eq.recommendation
+        officer_label = eq.recorded_by_name or eq.recorded_on_behalf_of or ""
+        events.append({
+            "date":    str(eq.enquiry_date or ""),
+            "type":    "enquiry",
+            "title":   f"Enquiry — {eq.enquiry_type}",
+            "officer": officer_label,
+            "details": details,
+        })
+
+    # 6. Appeals
     appeals = frappe.db.get_all(
         "Appeal",
         filters={"linked_grievance": grievance.name},
