@@ -68,7 +68,7 @@ def _build_grievance_filters(officer, level=None, district=None, mandal=None,
 
 # ── User Info ──────────────────────────────────────────────────────────────────
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_user_info():
     """Return current session user info + roles + officer profile."""
     user = frappe.session.user

@@ -1262,7 +1262,12 @@ const App = {
   components: { Toast },
   setup() {
     onMounted(async () => {
-      try { userInfo.value = await api.getUserInfo() } catch {}
+      try {
+        userInfo.value = await api.getUserInfo()
+      } catch {}
+      if (!userInfo.value?.logged_in) {
+        window.location.href = '/login?redirect-to=' + encodeURIComponent(window.location.pathname)
+      }
     })
     return {}
   },
